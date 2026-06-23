@@ -46,7 +46,139 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
         console.error("Erro ao enviar arquivo:", error);
     }
 });
+// ==========================================
+// 0. CONTROLE DE TELA (LOGIN / APLICATIVO)
+// ==========================================
+let isModoCadastro = false;
 
+// Elementos da UI
+const authScreen = document.getElementById('auth-screen');
+const appScreen = document.getElementById('app-screen');
+const tabLogin = document.getElementById('tabLogin');
+const tabCadastro = document.getElementById('tabCadastro');
+const authNome = document.getElementById('authNome');
+const authEmail = document.getElementById('authEmail');
+const authSenha = document.getElementById('authSenha');
+const btnAuthAction = document.getElementById('btnAuthAction');
+const authMessage = document.getElementById('authMessage');
+
+// Função para mostrar mensagens de erro/sucesso na tela
+function showMessage(text, isError = true) {
+    authMessage.innerText = text;
+    authMessage.style.color = isError ? '#dc3545' : '#28a745';
+    authMessage.style.display = 'block';
+}
+
+// Checagem inicial: O usuário já está logado?
+function verificarLoginInicial() {
+    const token = localStorage.getItem('token');
+    if (token) {
+        authScreen.style.display = 'none';
+        appScreen.style.display = 'block';
+    } else {
+        authScreen.style.display = 'flex';
+        appScreen.style.display = 'none';
+    }
+}
+verificarLoginInicial(); // Roda assim que a página abre
+
+// Botão de Sair (Logout)
+document.getElementById('btnLogout').addEventListener('click', () => {
+    localStorage.removeItem('token');
+    // Limpa o visualizador para não ficar resto de livro na tela
+    if (currentRendition) currentRendition.destroy();
+    document.getElementById('viewer').innerHTML = ''; 
+    verificarLoginInicial();
+});
+
+// Alternar entre abas (Entrar / Cadastrar)
+tabLogin.addEventListener('click', () => {
+    isModoCadastro = false;
+    authNome.style.display = 'none';
+    btnAuthAction.innerText = 'Entrar';
+    tabLogin.style.borderBottom = '3px solid #007bff';
+    tabLogin.style.color = '#007bff';
+    tabCadastro.style.borderBottom = 'none';
+    tabCadastro.style.color = '#888';
+    authMessage.style.display = 'none';
+});
+
+tabCadastro.addEventListener('click', () => {
+    isModoCadastro = true;
+    authNome.style.display = 'block';
+    btnAuthAction.innerText = 'Criar Conta';
+    tabCadastro.style.borderBottom = '3px solid #007bff';
+    tabCadastro.style.color = '#007bff';
+    tabLogin.style.borderBottom = 'none';
+    tabLogin.style.color = '#888';
+    authMessage.style.display = 'none';
+});
+
+// Validador de E-mail (Regex de Frontend)
+function isEmailValido(email) {
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
+}
+
+// Ação principal de Login ou Cadastro
+btnAuthAction.addEventListener('click', async () => {
+    const nome = authNome.value.trim();
+    const email = authEmail.value.trim();
+    const senha = authSenha.value.trim();
+
+    // Validações locais
+    if (!email || !senha || (isModoCadastro && !nome)) {
+        showMessage("Por favor, preencha todos os campos.");
+        return;
+    }
+    
+    if (!isEmailValido(email)) {
+        showMessage("Digite um formato de e-mail válido.");
+        return;
+    }
+
+    btnAuthAction.disabled = true;
+    btnAuthAction.innerText = "Aguarde...";
+
+    const url = isModoCadastro ? '/api/auth/cadastro' : '/api/auth/login';
+    const payload = isModoCadastro ? { nome, email, senha } : { email, senha };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            if (isModoCadastro) {
+                // Cadastro deu certo, muda pra aba de login
+                showMessage("Conta criada! Faça login.", false);
+                tabLogin.click();
+            } else {
+                // Login deu certo, salva o token e entra no App
+                localStorage.setItem('token', data.token);
+                authEmail.value = '';
+                authSenha.value = '';
+                verificarLoginInicial();
+            }
+        } else {
+            showMessage(data.erro);
+        }
+    } catch (error) {
+        showMessage("Erro de conexão com o servidor.");
+    } finally {
+        btnAuthAction.disabled = false;
+        btnAuthAction.innerText = isModoCadastro ? "Criar Conta" : "Entrar";
+    }
+});
+
+// (Seu código existente do upload, ePub.js e etc continua daqui para baixo...)
+// ==========================================
+// 1. VARIÁVEIS GLOBAIS
+// ...
 // ==========================================
 // 3. RENDERIZAR O LIVRO E ACIONAR A IA
 // ==========================================

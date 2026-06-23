@@ -88,6 +88,11 @@ app.post('/api/auth/cadastro', async (req, res) => {
         return res.status(400).json({ erro: 'Preencha todos os campos.' });
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ erro: 'O formato do e-mail é inválido.' });
+    }
+
     try {
         // Criptografa a senha com um fator de custo de 10
         const senhaHash = await bcrypt.hash(senha, 10);
@@ -171,7 +176,7 @@ app.post('/api/explicar', autenticarToken, async (req, res) => {
     while (tentativas > 0) {
         try {
             const response = await ai.models.generateContent({
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-flash',
                 contents: prompt,
             });
 

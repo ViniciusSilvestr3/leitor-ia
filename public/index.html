@@ -1,58 +1,84 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leitor IA</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background-color: #f4f4f9; }
+    </style>
 </head>
 <body>
-<div class="container" style="max-width: 900px; margin: 0 auto; padding: 20px; height: 90vh; display: flex; flex-direction: column;">
-        <h1 style="margin-top: 0; text-align: center;">📚 Leitor IA</h1>
-        <div class="upload-section" style="margin-bottom: 15px; text-align: center;">
-            <input type="file" id="epubInput" accept=".epub">
-            <button id="uploadBtn" style="padding: 5px 15px; cursor: pointer;">Abrir Livro</button>
-        </div>
-        
-        <div id="viewer" style="flex-grow: 1; border: 1px solid #ccc; background-color: #fcfcfc; overflow: hidden; position: relative; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);"></div>
-        
-        <div id="controls" style="display: none; text-align: center; margin-top: 15px;">
-            <button id="prevBtn" style="padding: 10px 20px; margin-right: 10px; cursor: pointer;">⬅️ Anterior</button>
-            <button id="nextBtn" style="padding: 10px 20px; cursor: pointer;">Próxima ➡️</button>
-        </div>
-    </div>
 
-    <div id="modalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(2px);">
-        
-        <div id="modalContent" style="background: #fff; width: 90%; max-width: 450px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative;">
+    <div id="auth-screen" style="display: flex; height: 100vh; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
+            <h2 style="margin-top: 0;">📚 Leitor IA</h2>
+            <p style="color: #666; margin-bottom: 25px;">Acesse para salvar seu vocabulário</p>
             
-            <span id="closeModal" style="position: absolute; top: 12px; right: 18px; font-size: 24px; cursor: pointer; color: #aaa; transition: color 0.2s;">&times;</span>
-            
-            <h3 style="margin-top: 0; color: #333; font-size: 18px;">🧠 Análise da IA</h3>
-            
-            <div style="margin-bottom: 15px;">
-                <span style="font-size: 12px; color: #777; text-transform: uppercase; font-weight: bold;">Termo Selecionado</span>
-                <p id="termo-box" style="background: #f4f4f9; padding: 10px; border-radius: 6px; margin: 5px 0; font-weight: bold; color: #222; font-size: 16px;"></p>
+            <div style="display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee;">
+                <button id="tabLogin" style="flex: 1; padding: 10px; cursor: pointer; font-weight: bold; border: none; background: none; border-bottom: 3px solid #007bff; color: #007bff;">Entrar</button>
+                <button id="tabCadastro" style="flex: 1; padding: 10px; cursor: pointer; font-weight: bold; border: none; background: none; color: #888;">Cadastrar</button>
             </div>
 
-            <div style="margin-bottom: 20px; max-height: 250px; overflow-y: auto;">
-                <span style="font-size: 12px; color: #777; text-transform: uppercase; font-weight: bold;">Contexto e Explicação</span>
-                <p id="explicacao-box" style="font-size: 15px; line-height: 1.6; color: #444; margin-top: 5px;"></p>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="authNome" placeholder="Seu Nome" style="display: none; padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
+                <input type="email" id="authEmail" placeholder="seu@email.com" style="padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
+                <input type="password" id="authSenha" placeholder="Sua senha secreta" style="padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
+                
+                <p id="authMessage" style="font-size: 13px; margin: 0; font-weight: bold; display: none;"></p>
+                
+                <button id="btnAuthAction" style="padding: 14px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Entrar</button>
             </div>
-
-            <button id="btnSalvarCard" style="width: 100%; background-color: #28a745; color: white; border: none; padding: 14px; font-weight: bold; font-size: 15px; border-radius: 6px; cursor: pointer; display: none; transition: background 0.3s;">
-                ➕ Adicionar aos Flashcards
-            </button>
         </div>
     </div>
 
+    <div id="app-screen" style="display: none;">
+        
+        <div style="text-align: right; padding: 10px 20px;">
+            <button id="btnLogout" style="padding: 8px 15px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Sair da Conta</button>
+        </div>
+
+        <div class="container" style="max-width: 900px; margin: 0 auto; padding: 0 20px 20px 20px; height: 80vh; display: flex; flex-direction: column;">
+            <h1 style="margin-top: 0; text-align: center;">📚 Leitor IA</h1>
+            
+            <div class="upload-section" style="margin-bottom: 15px; text-align: center;">
+                <input type="file" id="epubInput" accept=".epub">
+                <button id="uploadBtn" style="padding: 5px 15px; cursor: pointer;">Abrir Livro</button>
+            </div>
+            
+            <div id="viewer" style="flex-grow: 1; border: 1px solid #ccc; background-color: #fcfcfc; overflow: hidden; position: relative; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);"></div>
+            
+            <div id="controls" style="display: none; text-align: center; margin-top: 15px;">
+                <button id="prevBtn" style="padding: 10px 20px; margin-right: 10px; cursor: pointer;">⬅️ Anterior</button>
+                <button id="nextBtn" style="padding: 10px 20px; cursor: pointer;">Próxima ➡️</button>
+            </div>
+        </div>
+
+        <div id="modalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(2px);">
+            <div id="modalContent" style="background: #fff; width: 90%; max-width: 450px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative;">
+                <span id="closeModal" style="position: absolute; top: 12px; right: 18px; font-size: 24px; cursor: pointer; color: #aaa;">&times;</span>
+                
+                <h3 style="margin-top: 0; color: #333; font-size: 18px;">🧠 Análise da IA</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <span style="font-size: 12px; color: #777; text-transform: uppercase; font-weight: bold;">Termo Selecionado</span>
+                    <p id="termo-box" style="background: #f4f4f9; padding: 10px; border-radius: 6px; margin: 5px 0; font-weight: bold; color: #222; font-size: 16px;"></p>
+                </div>
+
+                <div style="margin-bottom: 20px; max-height: 250px; overflow-y: auto;">
+                    <span style="font-size: 12px; color: #777; text-transform: uppercase; font-weight: bold;">Contexto e Explicação</span>
+                    <p id="explicacao-box" style="font-size: 15px; line-height: 1.6; color: #444; margin-top: 5px;"></p>
+                </div>
+
+                <button id="btnSalvarCard" style="width: 100%; background-color: #28a745; color: white; border: none; padding: 14px; font-weight: bold; font-size: 15px; border-radius: 6px; cursor: pointer; display: none;">
+                    ➕ Adicionar aos Flashcards
+                </button>
+            </div>
+        </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
