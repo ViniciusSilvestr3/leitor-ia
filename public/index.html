@@ -3,76 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leitor IA</title>
+    <title>Leitor Inteligente</title>
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; background-color: #f4f4f9; }
+        /* Variáveis de Tema (Claro por padrão) */
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --text: #333333;
+            --text-muted: #7f8c8d;
+            --border: #e2e8f0;
+            --danger: #e74c3c;
+            --success: #27ae60;
+        }
+
+        /* Variáveis de Tema (Noturno) */
+        body.dark-mode {
+            --primary: #ecf0f1;
+            --accent: #2980b9;
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --text: #e0e0e0;
+            --text-muted: #95a5a6;
+            --border: #333333;
+        }
+
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); transition: background-color 0.3s, color 0.3s; }
+        
+        /* Navbar Minimalista */
+        nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 15px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; transition: background-color 0.3s; }
+        .nav-brand { font-weight: 600; font-size: 1.2rem; color: var(--primary); letter-spacing: 0.5px; }
+        .nav-links { display: flex; gap: 15px; align-items: center; }
+        nav button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 0.95rem; padding: 5px 10px; transition: color 0.2s; }
+        nav button.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        
+        .btn-outline { border: 1px solid var(--border) !important; border-radius: 4px; }
+        .btn-outline:hover { background: var(--border); }
+        .btn-danger { color: var(--danger) !important; }
+
+        /* Leitor */
+        .container-leitor { flex-grow: 1; display: flex; flex-direction: column; padding: 20px 10px; max-width: 1000px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .upload-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .upload-bar input { color: var(--text); }
+        .btn-primary { background: var(--primary); color: var(--surface); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
+        .btn-primary:hover { opacity: 0.9; }
+        
+        #viewer { flex-grow: 1; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); height: 70vh; transition: background-color 0.3s; }
+
+        /* Vocabulário */
+        .livro-grupo { margin-bottom: 40px; }
+        .livro-titulo-grupo { border-bottom: 1px solid var(--border); padding-bottom: 8px; color: var(--primary); font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; }
+        .vocab-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 768px) { .vocab-grid { grid-template-columns: 1fr 1fr; } }
+        
+        .vocab-card { background: var(--surface); padding: 25px; border-radius: 8px; border: 1px solid var(--border); position: relative; display: flex; flex-direction: column; transition: background-color 0.3s; }
+        .vocab-card strong { font-size: 1.1rem; color: var(--accent); margin-bottom: 8px; }
+        .vocab-card i { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px; display: block; font-style: italic; }
+        .vocab-card p { margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--text); flex-grow: 1; }
+        
+        .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px; }
+        .btn-text { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; font-weight: 500; padding: 0; }
+        .btn-text.danger { color: var(--text-muted); }
+        .btn-text.danger:hover { color: var(--danger); }
+
+        /* Modal Minimalista */
+        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; backdrop-filter: blur(2px); }
+        #modalContent { width: 90%; max-width: 450px; background: var(--surface); padding: 30px; border-radius: 8px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 1px solid var(--border); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--primary); }
+        .close-btn { cursor: pointer; color: var(--text-muted); font-size: 1.5rem; line-height: 1; }
+        #termo-box { font-size: 1.1rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
+        #explicacao-box { font-size: 0.95rem; line-height: 1.6; color: var(--text); margin-bottom: 25px; }
+
+        /* Autenticação (Mantida simples) */
+        .auth-container { background: var(--surface); padding: 40px; border-radius: 8px; border: 1px solid var(--border); width: 100%; max-width: 380px; }
+        .auth-input { width: 100%; padding: 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); box-sizing: border-box; margin-bottom: 15px; }
     </style>
 </head>
 <body>
-
-    <div id="auth-screen" style="display: flex; height: 100vh; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center;">
-            <h2 style="margin-top: 0;">📚 Leitor IA</h2>
-            <p style="color: #666; margin-bottom: 25px;">Acesse para salvar seu vocabulário</p>
-            
-            <div style="display: flex; margin-bottom: 20px; border-bottom: 2px solid #eee;">
-                <button id="tabLogin" style="flex: 1; padding: 10px; cursor: pointer; font-weight: bold; border: none; background: none; border-bottom: 3px solid #007bff; color: #007bff;">Entrar</button>
-                <button id="tabCadastro" style="flex: 1; padding: 10px; cursor: pointer; font-weight: bold; border: none; background: none; color: #888;">Cadastrar</button>
+    <div id="auth-screen" style="display: flex; height: 100vh; justify-content: center; align-items: center; padding: 20px;">
+        <div class="auth-container">
+            <h2 style="margin-top: 0; text-align: center; color: var(--primary);">Leitor Inteligente</h2>
+            <div style="display: flex; margin-bottom: 25px; border-bottom: 1px solid var(--border);">
+                <button id="tabLogin" style="flex: 1; padding: 10px; cursor: pointer; font-weight: 500; border: none; background: none; border-bottom: 2px solid var(--accent); color: var(--accent);">Entrar</button>
+                <button id="tabCadastro" style="flex: 1; padding: 10px; cursor: pointer; font-weight: 500; border: none; background: none; color: var(--text-muted);">Cadastrar</button>
             </div>
-
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <input type="text" id="authNome" placeholder="Seu Nome" style="display: none; padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
-                <input type="email" id="authEmail" placeholder="seu@email.com" style="padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
-                <input type="password" id="authSenha" placeholder="Sua senha secreta" style="padding: 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px;">
-                
-                <p id="authMessage" style="font-size: 13px; margin: 0; font-weight: bold; display: none;"></p>
-                
-                <button id="btnAuthAction" style="padding: 14px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px;">Entrar</button>
+            <div>
+                <input type="text" id="authNome" class="auth-input" placeholder="Nome" style="display: none;">
+                <input type="email" id="authEmail" class="auth-input" placeholder="E-mail">
+                <input type="password" id="authSenha" class="auth-input" placeholder="Senha">
+                <p id="authMessage" style="font-size: 13px; margin: 0 0 15px 0; font-weight: 500; display: none;"></p>
+                <button id="btnAuthAction" class="btn-primary" style="width: 100%; padding: 14px;">Entrar</button>
             </div>
         </div>
     </div>
 
-    <div id="app-screen" style="display: none;">
+    <div id="app-screen" style="display: none; flex-direction: column; height: 100vh;">
+        <nav>
+            <div class="nav-brand">Leitor Inteligente</div>
+            <div class="nav-links">
+                <button id="navLeitor" class="active">Leitor</button>
+                <button id="navVocab">Vocabulário</button>
+                <button id="btnThemeToggle" class="btn-outline">Modo Escuro</button>
+                <button id="btnLogout" class="btn-danger">Sair</button>
+            </div>
+        </nav>
         
-        <div style="text-align: right; padding: 10px 20px;">
-            <button id="btnLogout" style="padding: 8px 15px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Sair da Conta</button>
-        </div>
-
-        <div class="container" style="max-width: 900px; margin: 0 auto; padding: 0 20px 20px 20px; height: 80vh; display: flex; flex-direction: column;">
-            <h1 style="margin-top: 0; text-align: center;">📚 Leitor IA</h1>
-            
-            <div class="upload-section" style="margin-bottom: 15px; text-align: center;">
+        <div id="screen-reader" class="sub-screen container-leitor">
+            <div class="upload-bar">
                 <input type="file" id="epubInput" accept=".epub">
-                <button id="uploadBtn" style="padding: 5px 15px; cursor: pointer;">Abrir Livro</button>
+                <button id="uploadBtn" class="btn-primary">Abrir Arquivo</button>
             </div>
-            
-            <div id="viewer" style="flex-grow: 1; border: 1px solid #ccc; background-color: #fcfcfc; overflow: hidden; position: relative; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);"></div>
-            
-            <div id="controls" style="display: none; text-align: center; margin-top: 15px;">
-                <button id="prevBtn" style="padding: 10px 20px; margin-right: 10px; cursor: pointer;">⬅️ Anterior</button>
-                <button id="nextBtn" style="padding: 10px 20px; cursor: pointer;">Próxima ➡️</button>
+            <div id="viewer"></div>
+            <div id="controls" style="display: none; text-align: center; margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;">
+                Clique nas laterais da tela para mudar de página.
             </div>
         </div>
 
-        <div id="modalOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(2px);">
-            <div id="modalContent" style="background: #fff; width: 90%; max-width: 450px; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative;">
-                <span id="closeModal" style="position: absolute; top: 12px; right: 18px; font-size: 24px; cursor: pointer; color: #aaa;">&times;</span>
-                
-                <h3 style="margin-top: 0; color: #333; font-size: 18px;">🧠 Análise da IA</h3>
-                
-                <div style="margin-bottom: 15px;">
-                    <span style="font-size: 12px; color: #777; text-transform: uppercase; font-weight: bold;">Termo Selecionado</span>
-                    <p id="termo-box" style="background: #f4f4f9; padding: 10px; border-radius: 6px; margin: 5px 0; font-weight: bold; color: #222; font-size: 16px;"></p>
+        <div id="screen-vocab" class="sub-screen" style="display: none; flex-grow: 1; padding: 30px 20px; overflow-y: auto;">
+            <div style="max-width: 900px; margin: 0 auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h2 style="margin: 0; color: var(--primary);">Seu Vocabulário</h2>
+                    <button id="btnIniciarJogo" class="btn-primary" style="background: var(--accent);">Iniciar Revisão</button>
                 </div>
+                <div id="lista-flashcards"></div>
+            </div>
+        </div>
 
-                <div style="margin-bottom: 20px; max-height: 250px; overflow-y: auto;">
-                    <span style="font-size: 12px; color: #777; text-transform: uppercase; font-weight: bold;">Contexto e Explicação</span>
-                    <p id="explicacao-box" style="font-size: 15px; line-height: 1.6; color: #444; margin-top: 5px;"></p>
+        <div id="screen-game" class="sub-screen" style="display: none; flex-grow: 1; background: var(--bg); padding: 20px; position: relative;">
+            <div style="max-width: 600px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                <div id="game-loading" style="text-align: center; display: none;"><h3 color="var(--text-muted)">Gerando perguntas...</h3></div>
+                <div id="game-content" style="display: none;">
+                    <div style="background: var(--surface); border: 1px solid var(--border); padding: 30px; border-radius: 8px; margin-bottom: 20px;">
+                        <h2 id="game-pergunta" style="margin: 0; font-size: 1.2rem; text-align: center;"></h2>
+                    </div>
+                    <div id="game-opcoes" style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+                        <button class="game-opt btn-outline" style="padding: 15px; background: var(--surface); color: var(--text); cursor: pointer;">Opt 1</button>
+                        <button class="game-opt btn-outline" style="padding: 15px; background: var(--surface); color: var(--text); cursor: pointer;">Opt 2</button>
+                        <button class="game-opt btn-outline" style="padding: 15px; background: var(--surface); color: var(--text); cursor: pointer;">Opt 3</button>
+                        <button class="game-opt btn-outline" style="padding: 15px; background: var(--surface); color: var(--text); cursor: pointer;">Opt 4</button>
+                    </div>
                 </div>
+                <div id="game-feedback" style="display: none; text-align: center; padding: 20px;">
+                    <h1 id="feedback-titulo" style="font-size: 2rem;"></h1>
+                    <p id="feedback-texto" style="font-size: 1rem; margin-bottom: 30px; color: var(--text);"></p>
+                    <button id="btnProximaPergunta" class="btn-primary" style="width: 100%;">Avançar</button>
+                </div>
+            </div>
+            <button id="btnSairJogo" class="btn-outline" style="position: absolute; top: 20px; right: 20px; padding: 8px 15px;">Encerrar</button>
+        </div>
 
-                <button id="btnSalvarCard" style="width: 100%; background-color: #28a745; color: white; border: none; padding: 14px; font-weight: bold; font-size: 15px; border-radius: 6px; cursor: pointer; display: none;">
-                    ➕ Adicionar aos Flashcards
-                </button>
+        <div id="modalOverlay">
+            <div id="modalContent">
+                <div class="modal-header">
+                    <h3>Análise Contextual</h3>
+                    <span id="closeModal" class="close-btn">&times;</span>
+                </div>
+                <div id="termo-box"></div>
+                <div id="explicacao-box"></div>
+                <button id="btnSalvarCard" class="btn-primary" style="width: 100%; display: none;">Salvar Palavra</button>
             </div>
         </div>
     </div>
@@ -81,4 +171,9 @@
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="script.js"></script>
 </body>
+<script>
+    if (localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark-mode');
+    }
+</script>
 </html>

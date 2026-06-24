@@ -1,57 +1,46 @@
 // ==========================================
-// 1. VARIÁVEIS GLOBAIS
+// 0. CONTROLE DE TELA E AUTENTICAÇÃO
+// ==========================================
+// ==========================================
+// 1. VARIÁVEIS GLOBAIS DA LEITURA
 // ==========================================
 let currentRendition;
 let termoAtual = "";
 let contextoAtual = "";
 let explicacaoAtual = "";
-
+let tituloLivroAtual = "Livro Desconhecido";
+let cfiAtual = "";
 // ==========================================
-// 2. UPLOAD DO LIVRO
+// MODO NOTURNO
 // ==========================================
-document.getElementById('uploadBtn').addEventListener('click', async () => {
-    const fileInput = document.getElementById('epubInput');
-    const file = fileInput.files[0];
+let isDarkMode = localStorage.getItem('theme') === 'dark';
+const btnThemeToggle = document.getElementById('btnThemeToggle');
 
-    if (!file) {
-        alert("Por favor, selecione um arquivo .epub primeiro!");
-        return;
+function aplicarTema() {
+    if (isDarkMode) {
+        document.body.classList.add('dark-mode');
+        btnThemeToggle.innerText = 'Modo Claro';
+    } else {
+        document.body.classList.remove('dark-mode');
+        btnThemeToggle.innerText = 'Modo Escuro';
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-        alert("Acesso negado: Você precisa estar logado para abrir um livro.");
-        return;
+    // Usa typeof para evitar ReferenceError (TDZ)
+    if (typeof currentRendition !== 'undefined' && currentRendition) {
+        currentRendition.themes.select(isDarkMode ? "dark" : "light");
     }
+}
 
-    const formData = new FormData();
-    formData.append('livro', file);
-
-    try {
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            console.log("Upload concluído! Caminho:", data.caminho);
-            renderizarLivro(data.caminho);
-        } else {
-            alert("Erro no upload: " + data.erro);
-        }
-    } catch (error) {
-        console.error("Erro ao enviar arquivo:", error);
-    }
+btnThemeToggle.addEventListener('click', () => {
+    isDarkMode = !isDarkMode;
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+    aplicarTema();
 });
-// ==========================================
-// 0. CONTROLE DE TELA (LOGIN / APLICATIVO)
-// ==========================================
+
+// Aplica o tema salvo logo ao abrir a página
+aplicarTema();
 let isModoCadastro = false;
 
-// Elementos da UI
 const authScreen = document.getElementById('auth-screen');
 const appScreen = document.getElementById('app-screen');
 const tabLogin = document.getElementById('tabLogin');
@@ -62,44 +51,37 @@ const authSenha = document.getElementById('authSenha');
 const btnAuthAction = document.getElementById('btnAuthAction');
 const authMessage = document.getElementById('authMessage');
 
-// Função para mostrar mensagens de erro/sucesso na tela
 function showMessage(text, isError = true) {
     authMessage.innerText = text;
     authMessage.style.color = isError ? '#dc3545' : '#28a745';
     authMessage.style.display = 'block';
 }
 
-// Checagem inicial: O usuário já está logado?
 function verificarLoginInicial() {
     const token = localStorage.getItem('token');
     if (token) {
         authScreen.style.display = 'none';
-        appScreen.style.display = 'block';
+        appScreen.style.display = 'flex'; 
     } else {
         authScreen.style.display = 'flex';
         appScreen.style.display = 'none';
     }
 }
-verificarLoginInicial(); // Roda assim que a página abre
+verificarLoginInicial(); 
 
-// Botão de Sair (Logout)
 document.getElementById('btnLogout').addEventListener('click', () => {
     localStorage.removeItem('token');
-    // Limpa o visualizador para não ficar resto de livro na tela
     if (currentRendition) currentRendition.destroy();
     document.getElementById('viewer').innerHTML = ''; 
     verificarLoginInicial();
 });
 
-// Alternar entre abas (Entrar / Cadastrar)
 tabLogin.addEventListener('click', () => {
     isModoCadastro = false;
     authNome.style.display = 'none';
     btnAuthAction.innerText = 'Entrar';
-    tabLogin.style.borderBottom = '3px solid #007bff';
-    tabLogin.style.color = '#007bff';
-    tabCadastro.style.borderBottom = 'none';
-    tabCadastro.style.color = '#888';
+    tabLogin.style.borderBottom = '3px solid #007bff'; tabLogin.style.color = '#007bff';
+    tabCadastro.style.borderBottom = 'none'; tabCadastro.style.color = '#888';
     authMessage.style.display = 'none';
 });
 
@@ -107,34 +89,26 @@ tabCadastro.addEventListener('click', () => {
     isModoCadastro = true;
     authNome.style.display = 'block';
     btnAuthAction.innerText = 'Criar Conta';
-    tabCadastro.style.borderBottom = '3px solid #007bff';
-    tabCadastro.style.color = '#007bff';
-    tabLogin.style.borderBottom = 'none';
-    tabLogin.style.color = '#888';
+    tabCadastro.style.borderBottom = '3px solid #007bff'; tabCadastro.style.color = '#007bff';
+    tabLogin.style.borderBottom = 'none'; tabLogin.style.color = '#888';
     authMessage.style.display = 'none';
 });
 
-// Validador de E-mail (Regex de Frontend)
 function isEmailValido(email) {
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return regex.test(email);
 }
 
-// Ação principal de Login ou Cadastro
 btnAuthAction.addEventListener('click', async () => {
     const nome = authNome.value.trim();
     const email = authEmail.value.trim();
     const senha = authSenha.value.trim();
 
-    // Validações locais
     if (!email || !senha || (isModoCadastro && !nome)) {
-        showMessage("Por favor, preencha todos os campos.");
-        return;
+        showMessage("Preencha todos os campos."); return;
     }
-    
     if (!isEmailValido(email)) {
-        showMessage("Digite um formato de e-mail válido.");
-        return;
+        showMessage("E-mail inválido."); return;
     }
 
     btnAuthAction.disabled = true;
@@ -149,113 +123,183 @@ btnAuthAction.addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-
         const data = await response.json();
 
         if (response.ok) {
             if (isModoCadastro) {
-                // Cadastro deu certo, muda pra aba de login
                 showMessage("Conta criada! Faça login.", false);
                 tabLogin.click();
             } else {
-                // Login deu certo, salva o token e entra no App
                 localStorage.setItem('token', data.token);
-                authEmail.value = '';
-                authSenha.value = '';
+                authEmail.value = ''; authSenha.value = '';
                 verificarLoginInicial();
             }
         } else {
             showMessage(data.erro);
         }
     } catch (error) {
-        showMessage("Erro de conexão com o servidor.");
+        showMessage("Erro de conexão.");
     } finally {
         btnAuthAction.disabled = false;
         btnAuthAction.innerText = isModoCadastro ? "Criar Conta" : "Entrar";
     }
 });
 
-// (Seu código existente do upload, ePub.js e etc continua daqui para baixo...)
+
 // ==========================================
-// 1. VARIÁVEIS GLOBAIS
-// ...
+// 2. UPLOAD DO LIVRO
 // ==========================================
-// 3. RENDERIZAR O LIVRO E ACIONAR A IA
+document.getElementById('uploadBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('epubInput');
+    const file = fileInput.files[0];
+
+    if (!file) { alert("Selecione um arquivo .epub primeiro!"); return; }
+    
+    const token = localStorage.getItem('token');
+    if (!token) { alert("Você precisa estar logado."); return; }
+
+    const formData = new FormData();
+    formData.append('livro', file);
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        const data = await response.json();
+        if (response.ok) renderizarLivro(data.caminho);
+        else alert("Erro: " + data.erro);
+    } catch (error) {
+        console.error("Erro no upload:", error);
+    }
+});
+
+// ==========================================
+// 3. RENDERIZAR O LIVRO E IA
+// ==========================================
+// ==========================================
+// 3. RENDERIZAR O LIVRO E IA (VERSÃO FINAL)
+// ==========================================
+// ==========================================
+// 3. RENDERIZAR O LIVRO E IA (COM PROGRESSO E CLIQUES)
 // ==========================================
 function renderizarLivro(caminhoUrl) {
     const urlCompleta = window.location.origin + caminhoUrl;
     
-    if (currentRendition) {
-        currentRendition.destroy();
-    }
+    if (currentRendition) currentRendition.destroy();
     document.getElementById('viewer').innerHTML = ''; 
     
     const book = ePub(urlCompleta);
     
-    // ATENÇÃO: É esta linha que evita o erro "undefined" que você tomou
+    book.ready.then(() => {
+        tituloLivroAtual = book.package.metadata.title || "Livro Desconhecido";
+    });
+    
     currentRendition = book.renderTo("viewer", {
         width: "100%",
         height: "100%",
         spread: "none",
+        flow: "paginated",     
+        manager: "continuous", 
         allowScriptedContent: true 
     });
 
-    currentRendition.display().then(() => {
-        console.log("Livro renderizado com sucesso!");
-        document.getElementById('controls').style.display = 'block';
-    }).catch((erro) => {
-        console.error("Erro ao renderizar:", erro);
+    // Registra os temas DENTRO do iframe do livro
+    currentRendition.themes.register("light", {
+        "body": { "background": "#ffffff", "color": "#333333" },
+        "img": { "max-width": "100% !important", "max-height": "80vh !important", "height": "auto !important", "object-fit": "contain !important", "display": "block !important", "margin": "0 auto !important" },
+        "svg": { "max-width": "100% !important", "max-height": "80vh !important" }
+    });
+    
+    currentRendition.themes.register("dark", {
+        "body": { "background": "#1e1e1e", "color": "#e0e0e0" },
+        "img": { "max-width": "100% !important", "max-height": "80vh !important", "height": "auto !important", "object-fit": "contain !important", "display": "block !important", "margin": "0 auto !important" },
+        "svg": { "max-width": "100% !important", "max-height": "80vh !important" },
+        "a": { "color": "#66b3ff" }
     });
 
-    // Lógica do Modal e IA
+    // Aplica o tema atual
+    currentRendition.themes.select(isDarkMode ? "dark" : "light");
+
+    // CARREGAR PROGRESSO: Verifica se existe uma página salva para este livro
+    book.ready.then(() => {
+        const progressoSalvo = localStorage.getItem('progresso_' + tituloLivroAtual);
+        if (progressoSalvo) {
+            currentRendition.display(progressoSalvo);
+        } else {
+            currentRendition.display();
+        }
+    });
+
+    currentRendition.display().then(() => {
+        document.getElementById('controls').style.display = 'block';
+    }).catch(erro => console.error("Erro ao renderizar:", erro));
+
+    // SALVAR PROGRESSO: Dispara toda vez que a página é virada
+    currentRendition.on("relocated", function(location) {
+        if (tituloLivroAtual !== "Livro Desconhecido") {
+            localStorage.setItem('progresso_' + tituloLivroAtual, location.start.cfi);
+        }
+    });
+
+    // MUDANÇA DE PÁGINA PELO CLIQUE (Ignora se for um grifo)
+    currentRendition.on("click", (e) => {
+        const contents = currentRendition.manager.getContents()[0];
+        const selecao = contents.window.getSelection().toString().trim();
+        
+        // Se o usuário selecionou algum texto, não muda de página
+        if (selecao.length > 0) return;
+
+        const screenWidth = contents.window.innerWidth;
+        const clickX = e.clientX;
+
+        if (clickX < screenWidth / 2) {
+            currentRendition.prev();
+        } else {
+            currentRendition.next();
+        }
+    });
+
+    // Lógica Inteligente de Captura para a IA (Mantida igual)
+    let timeoutSelecao;
     currentRendition.on("selected", function (cfiRange, contents) {
-        book.getRange(cfiRange).then(async function (range) {
+        clearTimeout(timeoutSelecao); 
+        timeoutSelecao = setTimeout(async () => {
+            const range = await book.getRange(cfiRange);
             const textoSelecionado = range.toString().trim();
-            
+
             if (textoSelecionado) {
                 const selection = contents.window.getSelection();
                 const node = selection.anchorNode;
                 const paragrafoContexto = node ? node.parentElement.textContent.trim() : "";
-
+                
                 contents.window.getSelection().removeAllRanges();
+                currentRendition.annotations.highlight(cfiRange, {}, (e) => {});
                 
                 const token = localStorage.getItem('token');
-                if (!token) {
-                    alert("Você precisa estar logado."); 
-                    return;
-                }
-
-                // Abre o Modal em modo de carregamento
-                document.getElementById('modalOverlay').style.display = 'flex';
+                
+                document.getElementById('modalOverlay').style.display = 'block';
                 document.getElementById('termo-box').innerText = textoSelecionado;
-                document.getElementById('explicacao-box').innerText = "A IA está analisando o contexto da obra. Aguarde...";
+                document.getElementById('explicacao-box').innerText = "Analisando contexto...";
                 document.getElementById('btnSalvarCard').style.display = 'none';
 
                 try {
                     const response = await fetch('/api/explicar', {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}` 
-                        },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ termo: textoSelecionado, contexto: paragrafoContexto })
                     });
-
                     const data = await response.json();
-
+                    
                     if (response.ok) {
-                        // Resposta recebida, atualiza o modal
                         document.getElementById('explicacao-box').innerText = data.explicacao;
+                        termoAtual = textoSelecionado; contextoAtual = paragrafoContexto; explicacaoAtual = data.explicacao; cfiAtual = cfiRange; 
                         
-                        termoAtual = textoSelecionado;
-                        contextoAtual = paragrafoContexto;
-                        explicacaoAtual = data.explicacao;
-
                         const btnSalvar = document.getElementById('btnSalvarCard');
-                        btnSalvar.style.display = 'block';
-                        btnSalvar.innerText = "➕ Adicionar aos Flashcards";
-                        btnSalvar.disabled = false;
-                        btnSalvar.style.backgroundColor = "#28a745";
+                        btnSalvar.style.display = 'block'; 
+                        btnSalvar.innerText = "Salvar Palavra";
+                        btnSalvar.disabled = false; 
                     } else {
                         document.getElementById('explicacao-box').innerText = "Erro: " + data.erro;
                     }
@@ -263,82 +307,268 @@ function renderizarLivro(caminhoUrl) {
                     document.getElementById('explicacao-box').innerText = "Erro de conexão com a API.";
                 }
             }
-        });
+        }, 400);
     });
 }
 
 // ==========================================
-// 4. SALVAR FLASHCARD NO BANCO
+// 4. SALVAR FLASHCARD NO BANCO E FECHAR MODAL
+// ==========================================
+// ==========================================
+// 4. SALVAR FLASHCARD NO BANCO E FECHAR MODAL
 // ==========================================
 document.getElementById('btnSalvarCard').addEventListener('click', async () => {
     const token = localStorage.getItem('token');
     const botao = document.getElementById('btnSalvarCard');
-    
-    botao.disabled = true;
+    botao.disabled = true; 
     botao.innerText = "Salvando...";
 
     try {
         const response = await fetch('/api/flashcards/salvar', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({ 
                 termo: termoAtual, 
                 contexto: contextoAtual, 
-                explicacao: explicacaoAtual 
+                explicacao: explicacaoAtual,
+                livro_titulo: tituloLivroAtual,
+                cfi: cfiAtual // Enviando a coordenada pro backend!
             })
         });
-
-        const data = await response.json();
+        const data = await response.json(); // Lendo o que o servidor respondeu
 
         if (response.ok) {
-            botao.innerText = "✔️ Salvo no Vocabulário!";
+            botao.innerText = "✔️ Salvo!"; 
             botao.style.backgroundColor = "#20c997"; 
         } else {
-            alert("Erro ao salvar: " + data.erro);
-            botao.disabled = false;
-            botao.innerText = "Tentar Novamente";
+            // Se der erro, joga o erro na tela (ou no botão)
+            botao.disabled = false; 
+            botao.innerText = "Erro!";
+            alert("Erro do Servidor: " + data.erro);
         }
-    } catch (error) {
-        alert("Erro de conexão.");
-        botao.disabled = false;
+    } catch (error) { 
+        botao.disabled = false; 
+        alert("Erro de conexão com o banco.");
     }
 });
 
-// ==========================================
-// 5. FECHAR O MODAL
-// ==========================================
 const modalOverlay = document.getElementById('modalOverlay');
-const btnFecharX = document.getElementById('closeModal');
-
-function fecharModal() {
-    modalOverlay.style.display = 'none';
-}
-
-btnFecharX.addEventListener('click', fecharModal);
-
-// Clicar fora da caixa branca fecha o modal
-modalOverlay.addEventListener('click', function(event) {
-    if (event.target === modalOverlay) {
-        fecharModal();
-    }
-});
+function fecharModal() { modalOverlay.style.display = 'none'; }
+document.getElementById('closeModal').addEventListener('click', fecharModal);
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) fecharModal(); });
 
 // ==========================================
-// 6. NAVEGAÇÃO DE PÁGINAS
+// 6. NAVEGAÇÃO DE PÁGINAS DO LEITOR
 // ==========================================
 document.getElementById('prevBtn').addEventListener('click', () => {
     if (currentRendition) currentRendition.prev();
 });
-
 document.getElementById('nextBtn').addEventListener('click', () => {
     if (currentRendition) currentRendition.next();
 });
-
 document.addEventListener('keyup', (e) => {
     if (!currentRendition) return; 
     if (e.key === 'ArrowLeft') currentRendition.prev();
     if (e.key === 'ArrowRight') currentRendition.next();
+});
+
+// ==========================================
+// 7. NAVEGAÇÃO E ABAS (Leitor vs Vocabulário)
+// ==========================================
+const navLeitor = document.getElementById('navLeitor');
+const navVocab = document.getElementById('navVocab');
+const screenReader = document.getElementById('screen-reader');
+const screenVocab = document.getElementById('screen-vocab');
+const screenGame = document.getElementById('screen-game');
+
+navLeitor.addEventListener('click', () => {
+    screenReader.style.display = 'flex'; screenVocab.style.display = 'none'; screenGame.style.display = 'none';
+    navLeitor.style.borderBottom = '2px solid white'; navLeitor.style.color = 'white';
+    navVocab.style.borderBottom = 'none'; navVocab.style.color = '#ccc';
+});
+
+navVocab.addEventListener('click', () => {
+    screenReader.style.display = 'none'; screenVocab.style.display = 'block'; screenGame.style.display = 'none';
+    navVocab.style.borderBottom = '2px solid white'; navVocab.style.color = 'white';
+    navLeitor.style.borderBottom = 'none'; navLeitor.style.color = '#ccc';
+    carregarVocabulario(); 
+});
+
+// ==========================================
+// 8. CARREGAR VOCABULÁRIO (Lista de Flashcards)
+// ==========================================
+// ==========================================
+// 8. CARREGAR E AGRUPAR VOCABULÁRIO + DELETAR
+// ==========================================
+// ==========================================
+// 8. CARREGAR E AGRUPAR VOCABULÁRIO + DELETAR
+// ==========================================
+async function carregarVocabulario() {
+    const token = localStorage.getItem('token');
+    const lista = document.getElementById('lista-flashcards');
+    lista.innerHTML = '<p style="text-align: center; color: #888;">Carregando...</p>';
+
+    try {
+        const response = await fetch('/api/flashcards', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.flashcards.length === 0) {
+                lista.innerHTML = '<p style="text-align: center; color: #888;">Nenhuma palavra salva ainda.</p>'; 
+                return;
+            }
+            
+            lista.innerHTML = '';
+            
+            const agrupados = data.flashcards.reduce((acc, card) => {
+                const titulo = card.livro_titulo || "Livro Desconhecido";
+                if (!acc[titulo]) acc[titulo] = [];
+                acc[titulo].push(card);
+                return acc;
+            }, {});
+
+            for (const [livro, cards] of Object.entries(agrupados)) {
+                let htmlGrupo = `
+                <div class="livro-grupo">
+                    <h3 class="livro-titulo-grupo">📖 ${livro}</h3>
+                    <div class="vocab-grid">`;
+                
+                cards.forEach(card => {
+                    // É AQUI DENTRO QUE DESENHAMOS O CARD E O BOTÃO AZUL:
+                    htmlGrupo += `
+                        <div class="vocab-card" id="card-${card.id}">
+                            <strong>${card.termo_original}</strong>
+                            <i>"${card.frase_contexto}"</i>
+                            <p>${card.explicacao_ia}</p>
+                            
+                            <div class="card-actions">
+                                <button onclick="irParaGrifo('${card.cfi}')" class="btn-text">Ver no Livro</button>
+                                <button onclick="deletarFlashcard(${card.id})" class="btn-text danger">Excluir</button>
+                            </div>
+                        </div>`;
+                });
+                
+                htmlGrupo += `</div></div>`;
+                lista.innerHTML += htmlGrupo;
+            }
+        }
+    } catch (error) { lista.innerHTML = `<p style="color: red; text-align: center;">Erro de conexão.</p>`; }
+}
+
+// LÓGICA DE CLIQUE DO BOTÃO AZUL
+window.irParaGrifo = function(cfi) {
+    if (!cfi || cfi === 'undefined') {
+        alert("Ops! Esta palavra não tem localização salva.");
+        return;
+    }
+    
+    // 1. Muda visualmente para a aba do Leitor
+    document.getElementById('navLeitor').click(); 
+    
+    // 2. Se o livro já estiver aberto, pula direto pra página!
+    if (currentRendition) {
+        currentRendition.display(cfi); 
+    } else {
+        alert("Por favor, abra o arquivo .epub deste livro primeiro para viajar até a página.");
+    }
+};
+
+// Lógica Global para Deletar Flashcard
+window.deletarFlashcard = async function(id) {
+    if (!confirm("Tem certeza que deseja excluir esta palavra?")) return;
+    
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`/api/flashcards/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            document.getElementById(`card-${id}`).style.display = 'none';
+        } else {
+            alert("Erro ao excluir.");
+        }
+    } catch (error) {
+        alert("Falha na comunicação com o servidor.");
+    }
+};
+
+// Função Global para Deletar Flashcard
+window.deletarFlashcard = async function(id) {
+    if (!confirm("Tem certeza que deseja excluir esta palavra?")) return;
+    
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`/api/flashcards/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            document.getElementById(`card-${id}`).style.display = 'none'; // Remove visualmente com suavidade
+        } else {
+            alert("Erro ao excluir.");
+        }
+    } catch (error) {
+        alert("Falha na comunicação com o servidor.");
+    }
+};
+
+// ==========================================
+// 9. O MOTOR DO MINIGAME (Estilo Kahoot)
+// ==========================================
+let perguntasJogo = []; let perguntaAtualIndex = 0;
+const btnIniciarJogo = document.getElementById('btnIniciarJogo');
+const btnSairJogo = document.getElementById('btnSairJogo');
+const gameLoading = document.getElementById('game-loading');
+const gameContent = document.getElementById('game-content');
+const gameFeedback = document.getElementById('game-feedback');
+const botoesOpcao = document.querySelectorAll('.game-opt');
+
+btnIniciarJogo.addEventListener('click', async () => {
+    const token = localStorage.getItem('token');
+    screenVocab.style.display = 'none'; screenGame.style.display = 'flex';
+    gameLoading.style.display = 'block'; gameContent.style.display = 'none'; gameFeedback.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/minigame/gerar', { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await response.json();
+        if (response.ok) {
+            perguntasJogo = data.quiz; perguntaAtualIndex = 0;
+            gameLoading.style.display = 'none'; mostrarPergunta(); 
+        } else {
+            alert(data.erro); navVocab.click(); 
+        }
+    } catch (error) { alert("Erro ao gerar o jogo."); navVocab.click(); }
+});
+
+btnSairJogo.addEventListener('click', () => { navVocab.click(); });
+
+function mostrarPergunta() {
+    gameFeedback.style.display = 'none'; gameContent.style.display = 'block';
+    const perguntaAtual = perguntasJogo[perguntaAtualIndex];
+    document.getElementById('game-pergunta').innerText = perguntaAtual.pergunta;
+    botoesOpcao.forEach((botao, index) => {
+        botao.innerText = perguntaAtual.opcoes[index];
+        botao.onclick = () => verificarResposta(index);
+    });
+}
+
+function verificarResposta(indiceEscolhido) {
+    gameContent.style.display = 'none'; gameFeedback.style.display = 'block';
+    const perguntaAtual = perguntasJogo[perguntaAtualIndex];
+    const acertou = (indiceEscolhido === perguntaAtual.resposta_correta);
+    const titulo = document.getElementById('feedback-titulo');
+    const texto = document.getElementById('feedback-texto');
+
+    if (acertou) { titulo.innerText = "🎉 Correto!"; titulo.style.color = "#28a745"; } 
+    else { titulo.innerText = "❌ Incorreto!"; titulo.style.color = "#dc3545"; }
+    texto.innerText = perguntaAtual.explicacao;
+}
+
+document.getElementById('btnProximaPergunta').addEventListener('click', () => {
+    perguntaAtualIndex++;
+    if (perguntaAtualIndex < perguntasJogo.length) mostrarPergunta();
+    else { alert("🏆 Fim do jogo!"); navVocab.click(); }
 });

@@ -44,12 +44,15 @@ const db = new sqlite3.Database('./banco.sqlite', (err) => {
 
         // 2. Tabela de Flashcards (Modificada para incluir usuario_id)
         db.run(`CREATE TABLE IF NOT EXISTS flashcards (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER NOT NULL,
-            termo_original TEXT NOT NULL,
-            frase_contexto TEXT NOT NULL,
-            explicacao_ia TEXT,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+           id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER,
+    livro_titulo TEXT,
+    termo_original TEXT,
+    frase_contexto TEXT,
+    explicacao_ia TEXT,
+    cfi TEXT, 
+    data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
         )`);
     }
 });
@@ -112,7 +115,8 @@ app.post('/api/auth/cadastro', async (req, res) => {
     }
 });
 
-// 2. Login de Usuário
+
+// 2. Login de Usuário (Versão Blindada)
 app.post('/api/auth/login', (req, res) => {
     const { email, senha } = req.body;
 
@@ -121,30 +125,65 @@ app.post('/api/auth/login', (req, res) => {
     }
 
     const query = `SELECT * FROM usuarios WHERE email = ?`;
+    
     db.get(query, [email], async (err, usuario) => {
-        if (err) return res.status(500).json({ erro: 'Erro no servidor.' });
-        if (!usuario) return res.status(400).json({ erro: 'E-mail ou senha incorretos.' });
+        // O bloco TRY/CATCH agora abraça tudo. Se algo der errado, o catch segura e o servidor não cai.
+        try {
+            if (err) {
+                console.error("Erro no Banco de Dados:", err);
+                return res.status(500).json({ erro: 'Erro interno no servidor.' });
+            }
+            
+            if (!usuario) {
+                return res.status(400).json({ erro: 'E-mail ou senha incorretos.' });
+            }
 
-        // Compara a senha digitada com o Hash salvo no banco
-        const senhaCorreta = await bcrypt.compare(senha, usuario.senha_hash);
-        if (!senhaCorreta) return res.status(400).json({ erro: 'E-mail ou senha incorretos.' });
+            // Compara a senha digitada com o Hash salvo no banco
+            const senhaCorreta = await bcrypt.compare(senha, usuario.senha_hash);
+            
+            if (!senhaCorreta) {
+                return res.status(400).json({ erro: 'E-mail ou senha incorretos.' });
+            }
 
-        // Gera o Token JWT contendo o ID e o e-mail do usuário (expira em 7 dias)
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
+            // Segurança extra: Verifica se a variável do .env está lida corretamente
+            if (!process.env.JWT_SECRET) {
+                console.error("ERRO: JWT_SECRET não encontrado no arquivo .env");
+                return res.status(500).json({ erro: 'Falha na configuração do servidor.' });
+            }
 
-        // Devolve o token e os dados básicos do usuário
-        res.json({
-            mensagem: 'Login efetuado com sucesso!',
-            token,
-            usuario: { nome: usuario.nome, email: usuario.email }
-        });
+            // Gera o Token JWT
+            const token = jwt.sign(
+                { id: usuario.id, email: usuario.email },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d' }
+            );
+
+            res.json({
+                mensagem: 'Login efetuado com sucesso!',
+                token,
+                usuario: { nome: usuario.nome, email: usuario.email }
+            });
+
+        } catch (erroInterno) {
+            console.error("Erro capturado durante o login:", erroInterno);
+            res.status(500).json({ erro: 'Falha ao processar a autenticação.' });
+        }
     });
 });
+const verificarToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
+    if (!token) {
+        return res.status(401).json({ erro: 'Acesso negado. Token não fornecido.' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, usuario) => {
+        if (err) return res.status(403).json({ erro: 'Token inválido ou expirado.' });
+        req.usuario = usuario;
+        next();
+    });
+};
 // ==========================================
 // ROTAS DO NEGÓCIO (AGORA PROTEGIDAS)
 // ==========================================
@@ -197,21 +236,35 @@ app.post('/api/explicar', autenticarToken, async (req, res) => {
     }
 });
 // Rota para salvar o flashcard manualmente
-app.post('/api/flashcards/salvar', autenticarToken, (req, res) => {
-    const { termo, contexto, explicacao } = req.body;
+// 4. Salvar Flashcard
+// 4. Salvar Flashcard (COM DEBUG DE ERRO)
+app.post('/api/flashcards/salvar', verificarToken, (req, res) => {
+    const { termo, contexto, explicacao, livro_titulo, cfi } = req.body;
+    const usuario_id = req.usuario.id;
 
-    if (!termo || !contexto || !explicacao) {
-        return res.status(400).json({ erro: 'Dados incompletos para salvar o flashcard.' });
-    }
+    if (!termo || !explicacao) return res.status(400).json({ erro: 'Dados incompletos.' });
 
-    const query = `INSERT INTO flashcards (usuario_id, termo_original, frase_contexto, explicacao_ia) VALUES (?, ?, ?, ?)`;
+    const titulo = livro_titulo || 'Livro Desconhecido';
+    const coordenada = cfi || '';
+
+    const query = `INSERT INTO flashcards (usuario_id, livro_titulo, termo_original, frase_contexto, explicacao_ia, cfi) VALUES (?, ?, ?, ?, ?, ?)`;
     
-    db.run(query, [req.usuario.id, termo, contexto, explicacao], function(err) {
+    db.run(query, [usuario_id, titulo, termo, contexto, explicacao, coordenada], function(err) {
         if (err) {
-            console.error("Erro ao salvar flashcard:", err.message);
-            return res.status(500).json({ erro: 'Não foi possível salvar no seu vocabulário.' });
+            console.error("ERRO NO SQLITE:", err.message); // Vai imprimir o erro real no terminal do VS Code
+            return res.status(500).json({ erro: err.message }); // Vai mandar o erro para o navegador
         }
-        res.json({ mensagem: 'Flashcard salvo com sucesso!', id: this.lastID });
+        res.status(201).json({ mensagem: 'Salvo com sucesso!', id: this.lastID });
+    });
+});
+// Rota para deletar um flashcard
+app.delete('/api/flashcards/:id', verificarToken, (req, res) => {
+    const { id } = req.params;
+    const usuario_id = req.usuario.id;
+
+    db.run(`DELETE FROM flashcards WHERE id = ? AND usuario_id = ?`, [id, usuario_id], function(err) {
+        if (err) return res.status(500).json({ erro: 'Erro ao deletar.' });
+        res.json({ mensagem: 'Deletado com sucesso.' });
     });
 });
 // ==========================================
