@@ -4,7 +4,15 @@ async function explain(req, res) {
     const { termo, contexto } = req.body;
     if (!termo || !contexto) return res.status(400).json({ erro: 'Dados incompletos.' });
     console.log(`Usuário ID ${req.usuario.id} está consultando o termo.`);
-    res.json({ explicacao: await aiService.explainTerm(termo, contexto) });
+    const analise = await aiService.explainTerm(termo, contexto);
+    const explicacao = [
+        `Tradução: ${analise.traducao}`,
+        `Sentido no contexto: ${analise.sentido_no_contexto}`,
+        `Papel na passagem: ${analise.papel_na_passagem}`,
+        `Em outras palavras: ${analise.parafrase}`
+    ].join('\n\n');
+
+    res.json({ explicacao, analise });
 }
 
 async function generateMinigame(req, res) {

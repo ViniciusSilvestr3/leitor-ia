@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leitor Inteligente</title>
+    <link rel="stylesheet" href="style.css">
     <style>
         /* Variáveis de Tema (Claro por padrão) */
         :root {
@@ -49,7 +50,9 @@
         .btn-primary { background: var(--primary); color: var(--surface); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
         .btn-primary:hover { opacity: 0.9; }
         
-        #viewer { flex-grow: 1; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); height: 70vh; transition: background-color 0.3s; }
+        #screen-reader { min-height: 0; gap: 14px; }
+        #viewer { flex: 1 1 auto; min-height: 0; overflow: auto; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); transition: background-color 0.3s; }
+        #viewer.pdf-mode { overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; }
 
         /* Vocabulário */
         .livro-grupo { margin-bottom: 40px; }
@@ -75,6 +78,9 @@
         .close-btn { cursor: pointer; color: var(--text-muted); font-size: 1.5rem; line-height: 1; }
         #termo-box { font-size: 1.1rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
         #explicacao-box { font-size: 0.95rem; line-height: 1.6; color: var(--text); margin-bottom: 25px; }
+        .analise-item { margin-bottom: 14px; }
+        .analise-item strong { display: block; color: var(--primary); margin-bottom: 3px; }
+        .analise-item p { margin: 0; }
 
         /* Autenticação (Mantida simples) */
         .auth-container { background: var(--surface); padding: 40px; border-radius: 8px; border: 1px solid var(--border); width: 100%; max-width: 380px; }
@@ -116,8 +122,13 @@
                 <button id="uploadBtn" class="btn-primary">Abrir Livro</button>
             </div>
             <div id="viewer"></div>
-            <div id="controls" style="display: none; text-align: center; margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;">
-                Clique nas laterais da tela para mudar de página.
+            <div id="controls" style="display: none; flex: 0 0 auto; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+                <div id="epub-controls-hint">Use as laterais da tela ou os botões para mudar de página.</div>
+                <div id="pdf-controls" class="pdf-controls" style="display: none;">
+                    <button id="prevBtn" class="btn-outline" type="button">Página anterior</button>
+                    <span id="pdf-page-counter">Página 1</span>
+                    <button id="nextBtn" class="btn-outline" type="button">Próxima página</button>
+                </div>
             </div>
         </div>
 
@@ -170,6 +181,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="script.js"></script>
 </body>
 <script>

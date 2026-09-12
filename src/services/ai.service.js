@@ -18,10 +18,10 @@ function buildRelevantContext(termo, contexto) {
 
     if (!sentences.length) return rawContext.slice(0, MAX_CONTEXT_LENGTH);
 
-    let bestSentence = sentences[0];
+    let bestIndex = 0;
     let bestScore = -Infinity;
 
-    for (const sentence of sentences) {
+    for (const [index, sentence] of sentences.entries()) {
         const lower = sentence.toLowerCase();
         let score = 0;
 
@@ -30,11 +30,13 @@ function buildRelevantContext(termo, contexto) {
 
         if (score > bestScore) {
             bestScore = score;
-            bestSentence = sentence;
+            bestIndex = index;
         }
     }
 
-    return bestSentence.slice(0, MAX_CONTEXT_LENGTH);
+    const start = Math.max(0, bestIndex - 1);
+    const end = Math.min(sentences.length, bestIndex + 2);
+    return sentences.slice(start, end).join(' ').slice(0, MAX_CONTEXT_LENGTH);
 }
 
 function shouldRetryModel(error) {
@@ -53,6 +55,7 @@ async function generateContent(prompt, config = {}, modelPriority = [geminiModel
                 contents: prompt,
                 config: {
                     ...config,
+                    responseMimeType: config.responseMimeType || 'text/plain',
                     thinkingConfig: {
                         includeThoughts: false,
                         thinkingBudget: 0
@@ -83,16 +86,26 @@ async function explainTerm(termo, contexto) {
 
     const buildPrompt = (mode = 'simple') => {
         if (mode === 'simple') {
-            return `Você é um professor de literatura.
-Termo: "${termoLimpo}"
-Contexto: "${contextoReduzido}"
-Responda em português em uma frase curta. Diga primeiro a tradução do termo no sentido dessa frase e depois explique a nuance em poucos termos. Máximo de 30 palavras.`;
+            return `Analise uma palavra ou expressão dentro de uma passagem de livro.
+Termo selecionado: "${termoLimpo}"
+Contexto da passagem: "${contextoReduzido}"
+    Responda exclusivamente com JSON válido, sem markdown, usando exatamente estas chaves:
+    {"traducao":"...","sentido_no_contexto":"...","papel_na_passagem":"...","parafrase":"..."}
+
+    Regras:
+    - Escreva em português claro.
+    - Explique o que o termo significa nesta situação específica, não uma definição genérica de dicionário.
+    - Se for uma expressão técnica, de jogo, literatura ou outra área, explique brevemente o conceito dessa área e depois relacione-o à passagem.
+    - Explique a emoção, intenção ou relação transmitida pelo termo quando isso estiver sustentado pelo contexto.
+    - A paráfrase deve reescrever a ideia da passagem em português natural.
+    - Não invente informações que não aparecem no contexto.
+    - Se o contexto for insuficiente, diga isso brevemente em "papel_na_passagem".`;
         }
 
-        return `Você é um professor de literatura.
+        return `Analise o termo de um livro com base somente no contexto abaixo.
 Termo: "${termoLimpo}"
 Contexto: "${contextoReduzido}"
-Resposta obrigatória em português, em uma única frase, sem listas nem markdown. Diga a tradução no sentido usado na frase e a nuance do termo.`;
+    Responda exclusivamente com JSON válido, sem markdown, usando estas chaves: traducao, sentido_no_contexto, papel_na_passagem, parafrase. Seja claro, contextual e não invente informações.`;
     };
 
     let explanation = '';
@@ -100,19 +113,35 @@ Resposta obrigatória em português, em uma única frase, sem listas nem markdow
     for (const mode of ['simple', 'fallback']) {
         const prompt = buildPrompt(mode);
         const result = await generateContent(prompt, {
-            maxOutputTokens: 120,
-            temperature: 0.2
+            maxOutputTokens: 240,
+            temperature: 0.2,
+            responseMimeType: 'application/json'
         });
 
-        const cleaned = normalizeText(result || '').replace(/^['"\n]+|['"\n]+$/g, '');
-        if (cleaned && cleaned.length >= 12 && cleaned.split(/\s+/).length >= 5) {
-            explanation = cleaned;
-            break;
-        }
+        const cleaned = String(result || '').trim().replace(/^```json\s*|^```\s*|\s*```$/g, '').trim();
+        try {
+            const parsed = JSON.parse(cleaned);
+            const analysis = {
+                traducao: normalizeText(parsed.traducao),
+                sentido_no_contexto: normalizeText(parsed.sentido_no_contexto),
+                papel_na_passagem: normalizeText(parsed.papel_na_passagem),
+                parafrase: normalizeText(parsed.parafrase)
+            };
+
+            if (Object.values(analysis).every(value => value)) {
+                explanation = analysis;
+                break;
+            }
+        } catch (_error) {}
     }
 
     if (!explanation) {
-        explanation = `O termo "${termoLimpo}" no contexto indicado significa algo relacionado ao uso da frase, e a nuance depende do sentido literário da passagem.`;
+        explanation = {
+            traducao: termoLimpo,
+            sentido_no_contexto: 'Não foi possível determinar o sentido com segurança a partir do contexto disponível.',
+            papel_na_passagem: 'O contexto enviado não foi suficiente para identificar a função do termo na passagem.',
+            parafrase: contextoReduzido || 'Contexto indisponível.'
+        };
     }
 
     explanationCache.set(cacheKey, explanation);

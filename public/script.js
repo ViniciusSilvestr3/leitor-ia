@@ -10,6 +10,8 @@ let contextoAtual = "";
 let explicacaoAtual = "";
 let tituloLivroAtual = "Livro Desconhecido";
 let cfiAtual = "";
+let pdfAtual = null;
+let paginaPdfAtual = 1;
 // ==========================================
 // MODO NOTURNO
 // ==========================================
@@ -190,6 +192,12 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
         return;
     }
 
+    pdfAtual = null;
+    document.getElementById('viewer').classList.remove('pdf-mode');
+    paginaPdfAtual = 1;
+    document.getElementById('pdf-controls').style.display = 'none';
+    document.getElementById('epub-controls-hint').style.display = 'block';
+    document.getElementById('pdf-page-counter').innerText = 'Página 1';
     const urlCompleta = window.location.origin + caminhoUrl;
     
     if (currentRendition) currentRendition.destroy();
@@ -239,6 +247,8 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
 
     currentRendition.display().then(() => {
         document.getElementById('controls').style.display = 'block';
+        document.getElementById('epub-controls-hint').style.display = 'block';
+        document.getElementById('pdf-controls').style.display = 'none';
     }).catch(erro => console.error("Erro ao renderizar:", erro));
 
     // SALVAR PROGRESSO: Dispara toda vez que a página é virada
@@ -307,8 +317,8 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
                     const data = await response.json();
                     
                     if (response.ok) {
-                        document.getElementById('explicacao-box').innerText = data.explicacao;
-                        termoAtual = textoSelecionado; contextoAtual = paragrafoContexto; explicacaoAtual = data.explicacao; cfiAtual = cfiRange; 
+                        const explicacaoFormatada = renderizarAnalise(data);
+                        termoAtual = textoSelecionado; contextoAtual = paragrafoContexto; explicacaoAtual = explicacaoFormatada; cfiAtual = cfiRange; 
                         
                         const btnSalvar = document.getElementById('btnSalvarCard');
                         btnSalvar.style.display = 'block'; 
@@ -328,52 +338,176 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
 
 async function renderizarPdf(caminhoUrl) {
     if (currentRendition) currentRendition.destroy();
+    pdfAtual = null;
     const viewer = document.getElementById('viewer');
+    viewer.classList.add('pdf-mode');
     viewer.innerHTML = '<p style="text-align:center; padding:20px;">Carregando PDF...</p>';
     document.getElementById('controls').style.display = 'block';
+    document.getElementById('epub-controls-hint').style.display = 'none';
+    document.getElementById('pdf-controls').style.display = 'flex';
+    document.getElementById('pdf-page-counter').innerText = 'Página 1';
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const pdf = await pdfjsLib.getDocument(window.location.origin + caminhoUrl).promise;
-    viewer.innerHTML = '';
+    pdfAtual = await pdfjsLib.getDocument(window.location.origin + caminhoUrl).promise;
     tituloLivroAtual = caminhoUrl.split('/').pop() || 'Livro PDF';
+    paginaPdfAtual = 1;
+    await renderizarPaginaPdf(paginaPdfAtual);
+}
 
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-        const page = await pdf.getPage(pageNumber);
-        const scale = Math.min(1.6, Math.max(1, viewer.clientWidth / page.getViewport({ scale: 1 }).width));
-        const viewport = page.getViewport({ scale });
-        const pageElement = document.createElement('div');
-        pageElement.className = 'pdf-page';
-        pageElement.dataset.pageNumber = pageNumber;
+async function renderizarPaginaPdf(pageNumber) {
+    if (!pdfAtual || pageNumber < 1 || pageNumber > pdfAtual.numPages) return;
 
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        pageElement.appendChild(canvas);
-        viewer.appendChild(pageElement);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    const viewer = document.getElementById('viewer');
+    viewer.innerHTML = '<p style="text-align:center; padding:20px;">Carregando página...</p>';
+    const page = await pdfAtual.getPage(pageNumber);
+    const tamanhoOriginal = page.getViewport({ scale: 1 });
+    const escalaHorizontal = (viewer.clientWidth - 24) / tamanhoOriginal.width;
+    const escalaVertical = (viewer.clientHeight - 24) / tamanhoOriginal.height;
+    const scale = Math.min(1.6, escalaHorizontal, escalaVertical);
+    const viewport = page.getViewport({ scale });
+    const pageElement = document.createElement('div');
+    pageElement.className = 'pdf-page';
+    pageElement.dataset.pageNumber = pageNumber;
 
-        const textContent = await page.getTextContent();
-        const textLayer = document.createElement('div');
-        textLayer.className = 'pdf-text-layer';
-        textContent.items.forEach(item => {
-            const span = document.createElement('span');
-            span.textContent = item.str;
-            const [scaleX, skewY, skewX, scaleY, translateX, translateY] = item.transform;
-            span.style.transform = `matrix(${scaleX}, ${skewY}, ${skewX}, ${-scaleY}, ${translateX}, ${viewport.height - translateY})`;
-            span.style.fontSize = `${Math.abs(scaleY)}px`;
-            textLayer.appendChild(span);
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    pageElement.appendChild(canvas);
+    viewer.innerHTML = '';
+    viewer.appendChild(pageElement);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    const textContent = await page.getTextContent();
+    const textLayer = document.createElement('div');
+    textLayer.className = 'pdf-text-layer textLayer';
+    textLayer.dataset.hasText = String(textContent.items.length > 0);
+
+    if (textContent.items.length > 0) {
+        const textDivs = [];
+        const renderTask = pdfjsLib.renderTextLayer({
+            textContent,
+            container: textLayer,
+            viewport,
+            textDivs
         });
-        pageElement.appendChild(textLayer);
-        pageElement.addEventListener('mouseup', () => processarSelecaoPdf(pageElement));
+        await renderTask.promise;
+    } else {
+        const ocrStatus = document.createElement('div');
+        ocrStatus.className = 'pdf-ocr-status';
+        ocrStatus.innerText = 'Reconhecendo texto da página...';
+        pageElement.appendChild(ocrStatus);
     }
+
+    pageElement.appendChild(textLayer);
+    pageElement.addEventListener('mouseup', () => processarSelecaoPdf(pageElement));
+    pageElement.addEventListener('touchend', () => processarSelecaoPdf(pageElement));
+
+    if (textContent.items.length === 0) {
+        reconhecerTextoPdf(pageElement, canvas);
+    }
+
+    paginaPdfAtual = pageNumber;
+    document.getElementById('pdf-page-counter').innerText = `Página ${pageNumber} de ${pdfAtual.numPages}`;
+    document.getElementById('prevBtn').disabled = pageNumber === 1;
+    document.getElementById('nextBtn').disabled = pageNumber === pdfAtual.numPages;
+}
+
+function renderizarAnalise(data) {
+    const caixa = document.getElementById('explicacao-box');
+    const analise = data.analise;
+
+    if (!analise) {
+        caixa.innerText = data.explicacao || 'Não foi possível gerar a análise.';
+        return data.explicacao || '';
+    }
+
+    const secoes = [
+        ['Tradução neste contexto', analise.traducao],
+        ['Sentido na passagem', analise.sentido_no_contexto],
+        ['Função na cena', analise.papel_na_passagem],
+        ['Em outras palavras', analise.parafrase]
+    ];
+
+    caixa.innerHTML = '';
+    secoes.forEach(([titulo, texto]) => {
+        const bloco = document.createElement('div');
+        bloco.className = 'analise-item';
+        const cabecalho = document.createElement('strong');
+        cabecalho.innerText = titulo;
+        const conteudo = document.createElement('p');
+        conteudo.innerText = texto;
+        bloco.append(cabecalho, conteudo);
+        caixa.appendChild(bloco);
+    });
+
+    return secoes.map(([titulo, texto]) => `${titulo}: ${texto}`).join('\n\n');
 }
 
 function processarSelecaoPdf(pageElement) {
     const selecao = window.getSelection().toString().trim();
     if (!selecao) return;
-    const textoDaPagina = pageElement.querySelector('.pdf-text-layer').innerText.trim();
+
+    const textoDoTexto = pageElement.querySelector('.pdf-text-layer');
+    const textoDaPagina = textoDoTexto?.dataset.pageText || textoDoTexto?.innerText.trim() || '';
+
+    if (!textoDaPagina || textoDoTexto?.dataset.hasText !== 'true') return;
     abrirAnaliseTermo(selecao, textoDaPagina, `pdf-page-${pageElement.dataset.pageNumber}`);
     window.getSelection().removeAllRanges();
+}
+
+async function reconhecerTextoPdf(pageElement, canvas) {
+    const textLayer = pageElement.querySelector('.pdf-text-layer');
+    const ocrStatus = pageElement.querySelector('.pdf-ocr-status');
+
+    if (!textLayer || !ocrStatus || ocrStatus.dataset.processing === 'true') return;
+
+    ocrStatus.dataset.processing = 'true';
+
+    try {
+        const ocrScale = 2;
+        const ocrCanvas = document.createElement('canvas');
+        ocrCanvas.width = canvas.width * ocrScale;
+        ocrCanvas.height = canvas.height * ocrScale;
+        const ocrContext = ocrCanvas.getContext('2d', { alpha: false });
+        ocrContext.fillStyle = '#ffffff';
+        ocrContext.fillRect(0, 0, ocrCanvas.width, ocrCanvas.height);
+        ocrContext.drawImage(canvas, 0, 0, ocrCanvas.width, ocrCanvas.height);
+
+        const resultado = await Tesseract.recognize(ocrCanvas, 'por+eng', {
+            logger: ({ status, progress }) => {
+                if (status === 'recognizing text') {
+                    ocrStatus.innerText = `Reconhecendo texto... ${Math.round(progress * 100)}%`;
+                }
+            }
+        });
+
+        textLayer.innerHTML = '';
+        const palavras = resultado.data.words.filter(word => word.text.trim() && word.confidence >= 35);
+        textLayer.dataset.hasText = String(palavras.length > 0);
+        textLayer.dataset.pageText = resultado.data.text.trim();
+
+        palavras.forEach(word => {
+            const span = document.createElement('span');
+            const esquerda = word.bbox.x0 / ocrScale;
+            const topo = word.bbox.y0 / ocrScale;
+            const largura = Math.max(1, (word.bbox.x1 - word.bbox.x0) / ocrScale);
+            const altura = Math.max(1, (word.bbox.y1 - word.bbox.y0) / ocrScale);
+            span.textContent = `${word.text} `;
+            span.style.left = `${esquerda}px`;
+            span.style.top = `${topo}px`;
+            span.style.width = `${largura}px`;
+            span.style.height = `${altura}px`;
+            span.style.fontSize = `${altura}px`;
+            span.style.lineHeight = `${altura}px`;
+            textLayer.appendChild(span);
+        });
+
+        ocrStatus.remove();
+    } catch (error) {
+        console.error('Erro no OCR do PDF:', error);
+        ocrStatus.dataset.processing = 'false';
+        ocrStatus.innerText = 'Não foi possível reconhecer o texto desta página.';
+    }
 }
 
 async function abrirAnaliseTermo(textoSelecionado, paragrafoContexto, cfi) {
@@ -391,10 +525,10 @@ async function abrirAnaliseTermo(textoSelecionado, paragrafoContexto, cfi) {
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.erro);
-        document.getElementById('explicacao-box').innerText = data.explicacao;
+        const explicacaoFormatada = renderizarAnalise(data);
         termoAtual = textoSelecionado;
         contextoAtual = paragrafoContexto;
-        explicacaoAtual = data.explicacao;
+        explicacaoAtual = explicacaoFormatada;
         cfiAtual = cfi;
         const btnSalvar = document.getElementById('btnSalvarCard');
         btnSalvar.style.display = 'block';
@@ -455,15 +589,22 @@ modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) f
 // 6. NAVEGAÇÃO DE PÁGINAS DO LEITOR
 // ==========================================
 document.getElementById('prevBtn').addEventListener('click', () => {
-    if (currentRendition) currentRendition.prev();
+    if (pdfAtual) renderizarPaginaPdf(paginaPdfAtual - 1);
+    else if (currentRendition) currentRendition.prev();
 });
 document.getElementById('nextBtn').addEventListener('click', () => {
-    if (currentRendition) currentRendition.next();
+    if (pdfAtual) renderizarPaginaPdf(paginaPdfAtual + 1);
+    else if (currentRendition) currentRendition.next();
 });
 document.addEventListener('keyup', (e) => {
-    if (!currentRendition) return; 
-    if (e.key === 'ArrowLeft') currentRendition.prev();
-    if (e.key === 'ArrowRight') currentRendition.next();
+    if (e.key === 'ArrowLeft') {
+        if (pdfAtual) renderizarPaginaPdf(paginaPdfAtual - 1);
+        else if (currentRendition) currentRendition.prev();
+    }
+    if (e.key === 'ArrowRight') {
+        if (pdfAtual) renderizarPaginaPdf(paginaPdfAtual + 1);
+        else if (currentRendition) currentRendition.next();
+    }
 });
 
 // ==========================================
