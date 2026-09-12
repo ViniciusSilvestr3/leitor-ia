@@ -1,0 +1,6 @@
+/* Camada de texto do PDF: permite selecionar palavras sobre o canvas. */
+.pdf-page { position: relative; margin: 0 auto 16px; width: fit-content; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
+.pdf-page canvas { display: block; max-width: 100%; height: auto; }
+.pdf-text-layer { position: absolute; inset: 0; overflow: hidden; line-height: 1; opacity: 0.2; }
+.pdf-text-layer span { position: absolute; color: transparent; white-space: pre; cursor: text; transform-origin: 0 0; }
+.pdf-text-layer ::selection { background: rgba(52, 152, 219, 0.35); }

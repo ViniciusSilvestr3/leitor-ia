@@ -112,8 +112,8 @@
         
         <div id="screen-reader" class="sub-screen container-leitor">
             <div class="upload-bar">
-                <input type="file" id="epubInput" accept=".epub">
-                <button id="uploadBtn" class="btn-primary">Abrir Arquivo</button>
+                <input type="file" id="epubInput" accept=".epub,.pdf,application/epub+zip,application/pdf">
+                <button id="uploadBtn" class="btn-primary">Abrir Livro</button>
             </div>
             <div id="viewer"></div>
             <div id="controls" style="display: none; text-align: center; margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;">
@@ -169,6 +169,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="script.js"></script>
 </body>
 <script>

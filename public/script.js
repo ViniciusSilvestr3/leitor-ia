@@ -168,7 +168,7 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
             body: formData
         });
         const data = await response.json();
-        if (response.ok) renderizarLivro(data.caminho);
+        if (response.ok) renderizarLivro(data.caminho, data.formato);
         else alert("Erro: " + data.erro);
     } catch (error) {
         console.error("Erro no upload:", error);
@@ -184,7 +184,12 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
 // ==========================================
 // 3. RENDERIZAR O LIVRO E IA (COM PROGRESSO E CLIQUES)
 // ==========================================
-function renderizarLivro(caminhoUrl) {
+function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'epub') {
+    if (formato === 'pdf') {
+        renderizarPdf(caminhoUrl);
+        return;
+    }
+
     const urlCompleta = window.location.origin + caminhoUrl;
     
     if (currentRendition) currentRendition.destroy();
@@ -309,6 +314,85 @@ function renderizarLivro(caminhoUrl) {
             }
         }, 400);
     });
+}
+
+async function renderizarPdf(caminhoUrl) {
+    if (currentRendition) currentRendition.destroy();
+    const viewer = document.getElementById('viewer');
+    viewer.innerHTML = '<p style="text-align:center; padding:20px;">Carregando PDF...</p>';
+    document.getElementById('controls').style.display = 'block';
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument(window.location.origin + caminhoUrl).promise;
+    viewer.innerHTML = '';
+    tituloLivroAtual = caminhoUrl.split('/').pop() || 'Livro PDF';
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const scale = Math.min(1.6, Math.max(1, viewer.clientWidth / page.getViewport({ scale: 1 }).width));
+        const viewport = page.getViewport({ scale });
+        const pageElement = document.createElement('div');
+        pageElement.className = 'pdf-page';
+        pageElement.dataset.pageNumber = pageNumber;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        pageElement.appendChild(canvas);
+        viewer.appendChild(pageElement);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+        const textContent = await page.getTextContent();
+        const textLayer = document.createElement('div');
+        textLayer.className = 'pdf-text-layer';
+        textContent.items.forEach(item => {
+            const span = document.createElement('span');
+            span.textContent = item.str;
+            const [scaleX, skewY, skewX, scaleY, translateX, translateY] = item.transform;
+            span.style.transform = `matrix(${scaleX}, ${skewY}, ${skewX}, ${-scaleY}, ${translateX}, ${viewport.height - translateY})`;
+            span.style.fontSize = `${Math.abs(scaleY)}px`;
+            textLayer.appendChild(span);
+        });
+        pageElement.appendChild(textLayer);
+        pageElement.addEventListener('mouseup', () => processarSelecaoPdf(pageElement));
+    }
+}
+
+function processarSelecaoPdf(pageElement) {
+    const selecao = window.getSelection().toString().trim();
+    if (!selecao) return;
+    const textoDaPagina = pageElement.querySelector('.pdf-text-layer').innerText.trim();
+    abrirAnaliseTermo(selecao, textoDaPagina, `pdf-page-${pageElement.dataset.pageNumber}`);
+    window.getSelection().removeAllRanges();
+}
+
+async function abrirAnaliseTermo(textoSelecionado, paragrafoContexto, cfi) {
+    const token = localStorage.getItem('token');
+    document.getElementById('modalOverlay').style.display = 'block';
+    document.getElementById('termo-box').innerText = textoSelecionado;
+    document.getElementById('explicacao-box').innerText = 'Analisando contexto...';
+    document.getElementById('btnSalvarCard').style.display = 'none';
+
+    try {
+        const response = await fetch('/api/explicar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ termo: textoSelecionado, contexto: paragrafoContexto })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.erro);
+        document.getElementById('explicacao-box').innerText = data.explicacao;
+        termoAtual = textoSelecionado;
+        contextoAtual = paragrafoContexto;
+        explicacaoAtual = data.explicacao;
+        cfiAtual = cfi;
+        const btnSalvar = document.getElementById('btnSalvarCard');
+        btnSalvar.style.display = 'block';
+        btnSalvar.innerText = 'Salvar Palavra';
+        btnSalvar.disabled = false;
+    } catch (error) {
+        document.getElementById('explicacao-box').innerText = `Erro: ${error.message}`;
+    }
 }
 
 // ==========================================
