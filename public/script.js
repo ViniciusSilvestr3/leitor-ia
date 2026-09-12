@@ -248,13 +248,16 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
         }
     });
 
+    let isSelectingText = false;
+    let selectionGuardTimer = null;
+
     // MUDANÇA DE PÁGINA PELO CLIQUE (Ignora se for um grifo)
     currentRendition.on("click", (e) => {
         const contents = currentRendition.manager.getContents()[0];
         const selecao = contents.window.getSelection().toString().trim();
-        
-        // Se o usuário selecionou algum texto, não muda de página
-        if (selecao.length > 0) return;
+
+        // Se a seleção ainda está ativa ou acabou de ocorrer, não navega.
+        if (selecao.length > 0 || isSelectingText) return;
 
         const screenWidth = contents.window.innerWidth;
         const clickX = e.clientX;
@@ -269,6 +272,12 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
     // Lógica Inteligente de Captura para a IA (Mantida igual)
     let timeoutSelecao;
     currentRendition.on("selected", function (cfiRange, contents) {
+        isSelectingText = true;
+        clearTimeout(selectionGuardTimer);
+        selectionGuardTimer = setTimeout(() => {
+            isSelectingText = false;
+        }, 250);
+
         clearTimeout(timeoutSelecao); 
         timeoutSelecao = setTimeout(async () => {
             const range = await book.getRange(cfiRange);
@@ -277,7 +286,7 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
             if (textoSelecionado) {
                 const selection = contents.window.getSelection();
                 const node = selection.anchorNode;
-                const paragrafoContexto = node ? node.parentElement.textContent.trim() : "";
+                const paragrafoContexto = node ? node.parentElement?.textContent?.trim() || "" : "";
                 
                 contents.window.getSelection().removeAllRanges();
                 currentRendition.annotations.highlight(cfiRange, {}, (e) => {});
@@ -312,6 +321,7 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
                     document.getElementById('explicacao-box').innerText = "Erro de conexão com a API.";
                 }
             }
+            isSelectingText = false;
         }, 400);
     });
 }

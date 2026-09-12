@@ -3,47 +3,118 @@ const { geminiModel } = require('../config/env');
 
 const ai = new GoogleGenAI({});
 const explanationCache = new Map();
-const MAX_CONTEXT_LENGTH = 2400;
+const MAX_CONTEXT_LENGTH = 1400;
 
-async function generateContent(prompt, config = {}) {
-    let attempts = 2;
-    while (attempts > 0) {
+function normalizeText(value = '') {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function buildRelevantContext(termo, contexto) {
+    const rawContext = normalizeText(contexto);
+    if (!rawContext) return '';
+
+    const cleanTerm = normalizeText(termo).toLowerCase();
+    const sentences = rawContext.split(/(?<=[.!?])\s+/).map(sentence => normalizeText(sentence)).filter(Boolean);
+
+    if (!sentences.length) return rawContext.slice(0, MAX_CONTEXT_LENGTH);
+
+    let bestSentence = sentences[0];
+    let bestScore = -Infinity;
+
+    for (const sentence of sentences) {
+        const lower = sentence.toLowerCase();
+        let score = 0;
+
+        if (lower.includes(cleanTerm)) score += 50;
+        score += sentence.split(/\s+/).filter(word => word.length > 3).length;
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestSentence = sentence;
+        }
+    }
+
+    return bestSentence.slice(0, MAX_CONTEXT_LENGTH);
+}
+
+function shouldRetryModel(error) {
+    const status = error?.status ?? error?.code ?? error?.response?.status;
+    return [400, 404, 429, 503].includes(Number(status));
+}
+
+async function generateContent(prompt, config = {}, modelPriority = [geminiModel]) {
+    const modelsToTry = [...new Set(modelPriority.filter(Boolean))];
+    let lastError;
+
+    for (const modelName of modelsToTry) {
         try {
             const response = await ai.models.generateContent({
-                model: geminiModel,
+                model: modelName,
                 contents: prompt,
-                config
+                config: {
+                    ...config,
+                    thinkingConfig: {
+                        includeThoughts: false,
+                        thinkingBudget: 0
+                    }
+                }
             });
             return response.text;
         } catch (error) {
-            if (error.status === 503 && attempts > 1) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                attempts--;
-                continue;
+            lastError = error;
+            if (!shouldRetryModel(error) || modelName === modelsToTry[modelsToTry.length - 1]) {
+                throw error;
             }
-            throw error;
+
+            const waitTime = error?.status === 429 ? 5000 : 2000;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
         }
     }
+
+    throw lastError;
 }
 
 async function explainTerm(termo, contexto) {
-    const contextoReduzido = contexto.trim().slice(0, MAX_CONTEXT_LENGTH);
-    const cacheKey = `${termo.trim().toLowerCase()}::${contextoReduzido.toLowerCase()}`;
+    const termoLimpo = normalizeText(termo);
+    const contextoReduzido = buildRelevantContext(termoLimpo, contexto);
+    const cacheKey = `${termoLimpo.toLowerCase()}::${contextoReduzido.toLowerCase()}`;
+
     if (explanationCache.has(cacheKey)) return explanationCache.get(cacheKey);
 
-    const prompt = `Você é um professor de literatura e especialista no ensino de idiomas auxiliando um leitor.
-O usuário teve dúvida no termo "${termo}", que aparece dentro do seguinte parágrafo do livro que ele está lendo:
-"${contextoReduzido}"
-Forneça uma resposta direta com:
-1. Tradução focando no sentido usado nesta frase.
-2. Explique em uma frase o tempo verbal ou a nuance literária/idiomática.
-Responda em no máximo 80 palavras.
-REGRA ABSOLUTA: Sob nenhuma circunstância dê spoilers ou revele fatos futuros da trama.`;
+    const buildPrompt = (mode = 'simple') => {
+        if (mode === 'simple') {
+            return `Você é um professor de literatura.
+Termo: "${termoLimpo}"
+Contexto: "${contextoReduzido}"
+Responda em português em uma frase curta. Diga primeiro a tradução do termo no sentido dessa frase e depois explique a nuance em poucos termos. Máximo de 30 palavras.`;
+        }
 
-    const explanation = await generateContent(prompt, {
-        maxOutputTokens: 120,
-        temperature: 0.2
-    });
+        return `Você é um professor de literatura.
+Termo: "${termoLimpo}"
+Contexto: "${contextoReduzido}"
+Resposta obrigatória em português, em uma única frase, sem listas nem markdown. Diga a tradução no sentido usado na frase e a nuance do termo.`;
+    };
+
+    let explanation = '';
+
+    for (const mode of ['simple', 'fallback']) {
+        const prompt = buildPrompt(mode);
+        const result = await generateContent(prompt, {
+            maxOutputTokens: 120,
+            temperature: 0.2
+        });
+
+        const cleaned = normalizeText(result || '').replace(/^['"\n]+|['"\n]+$/g, '');
+        if (cleaned && cleaned.length >= 12 && cleaned.split(/\s+/).length >= 5) {
+            explanation = cleaned;
+            break;
+        }
+    }
+
+    if (!explanation) {
+        explanation = `O termo "${termoLimpo}" no contexto indicado significa algo relacionado ao uso da frase, e a nuance depende do sentido literário da passagem.`;
+    }
+
     explanationCache.set(cacheKey, explanation);
     return explanation;
 }

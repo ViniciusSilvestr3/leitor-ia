@@ -7,5 +7,5 @@ module.exports = {
     jwtSecret: process.env.JWT_SECRET,
     databasePath: path.resolve(process.env.DATABASE_PATH || 'banco.sqlite'),
     uploadsPath: path.resolve(process.env.UPLOADS_PATH || 'uploads'),
-    geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    geminiModel: process.env.GEMINI_MODEL || 'gemini-3.6-flash'
 };
