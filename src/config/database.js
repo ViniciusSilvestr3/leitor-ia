@@ -31,24 +31,39 @@ function all(sql, parameters = []) {
 }
 
 async function initializeDatabase() {
-    await run(`CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        senha_hash TEXT NOT NULL,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    await run(`CREATE TABLE IF NOT EXISTS users (
+        cd_id_user INTEGER PRIMARY KEY AUTOINCREMENT,
+        nm_user TEXT NOT NULL,
+        ds_email TEXT NOT NULL UNIQUE,
+        ds_password_hash TEXT NOT NULL,
+        dt_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
     await run(`CREATE TABLE IF NOT EXISTS flashcards (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario_id INTEGER,
-        livro_titulo TEXT,
-        termo_original TEXT,
-        frase_contexto TEXT,
-        explicacao_ia TEXT,
-        cfi TEXT,
-        data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(usuario_id) REFERENCES usuarios(id)
+        cd_id_flashcard INTEGER PRIMARY KEY AUTOINCREMENT,
+        cd_id_user INTEGER,
+        nm_book_title TEXT,
+        ds_original_term TEXT,
+        ds_context_sentence TEXT,
+        ds_ai_explanation TEXT,
+        cd_cfi TEXT,
+        dt_created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(cd_id_user) REFERENCES users(cd_id_user)
+    )`);
+
+    await run(`CREATE TABLE IF NOT EXISTS dictionary (
+        cd_id_dictionary INTEGER PRIMARY KEY AUTOINCREMENT,
+        ds_term TEXT NOT NULL,
+        ds_normalized_term TEXT NOT NULL,
+        ds_normalized_context TEXT NOT NULL,
+        tp_language TEXT NOT NULL DEFAULT 'pt-BR',
+        ds_translation TEXT NOT NULL,
+        ds_contextual_meaning TEXT NOT NULL,
+        ds_passage_role TEXT NOT NULL,
+        ds_paraphrase TEXT NOT NULL,
+        dt_created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        dt_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (ds_normalized_term, ds_normalized_context, tp_language)
     )`);
 }
 

@@ -238,14 +238,8 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
     // CARREGAR PROGRESSO: Verifica se existe uma página salva para este livro
     book.ready.then(() => {
         const progressoSalvo = localStorage.getItem('progresso_' + tituloLivroAtual);
-        if (progressoSalvo) {
-            currentRendition.display(progressoSalvo);
-        } else {
-            currentRendition.display();
-        }
-    });
-
-    currentRendition.display().then(() => {
+        return progressoSalvo ? currentRendition.display(progressoSalvo) : currentRendition.display();
+    }).then(() => {
         document.getElementById('controls').style.display = 'block';
         document.getElementById('epub-controls-hint').style.display = 'block';
         document.getElementById('pdf-controls').style.display = 'none';
@@ -260,14 +254,17 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
 
     let isSelectingText = false;
     let selectionGuardTimer = null;
+    let lastSelectionAt = 0;
 
     // MUDANÇA DE PÁGINA PELO CLIQUE (Ignora se for um grifo)
     currentRendition.on("click", (e) => {
         const contents = currentRendition.manager.getContents()[0];
-        const selecao = contents.window.getSelection().toString().trim();
+        const selection = contents.window.getSelection();
+        const selecao = selection.toString().trim();
+        const selectionIsActive = selection.rangeCount > 0 && !selection.isCollapsed;
 
         // Se a seleção ainda está ativa ou acabou de ocorrer, não navega.
-        if (selecao.length > 0 || isSelectingText) return;
+        if (selectionIsActive || selecao.length > 0 || isSelectingText || Date.now() - lastSelectionAt < 800) return;
 
         const screenWidth = contents.window.innerWidth;
         const clickX = e.clientX;
@@ -283,10 +280,11 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
     let timeoutSelecao;
     currentRendition.on("selected", function (cfiRange, contents) {
         isSelectingText = true;
+        lastSelectionAt = Date.now();
         clearTimeout(selectionGuardTimer);
         selectionGuardTimer = setTimeout(() => {
             isSelectingText = false;
-        }, 250);
+        }, 800);
 
         clearTimeout(timeoutSelecao); 
         timeoutSelecao = setTimeout(async () => {

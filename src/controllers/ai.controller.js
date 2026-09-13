@@ -1,10 +1,10 @@
 const aiService = require('../services/ai.service');
 
 async function explain(req, res) {
-    const { termo, contexto } = req.body;
+    const { termo, contexto, idioma = 'pt-BR' } = req.body;
     if (!termo || !contexto) return res.status(400).json({ erro: 'Dados incompletos.' });
     console.log(`Usuário ID ${req.usuario.id} está consultando o termo.`);
-    const analise = await aiService.explainTerm(termo, contexto);
+    const analise = await aiService.explainTerm(termo, contexto, idioma);
     const explicacao = [
         `Tradução: ${analise.traducao}`,
         `Sentido no contexto: ${analise.sentido_no_contexto}`,

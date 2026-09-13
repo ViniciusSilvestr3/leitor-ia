@@ -8,7 +8,7 @@ async function createUser({ nome, email, senha }) {
 
     try {
         return await database.run(
-            'INSERT INTO usuarios (nome, email, senha_hash) VALUES (?, ?, ?)',
+            'INSERT INTO users (nm_user, ds_email, ds_password_hash) VALUES (?, ?, ?)',
             [nome, email, senhaHash]
         );
     } catch (error) {
@@ -22,12 +22,15 @@ async function createUser({ nome, email, senha }) {
 }
 
 async function authenticateUser(email, senha) {
-    const usuario = await database.get('SELECT * FROM usuarios WHERE email = ?', [email]);
-    if (!usuario || !(await bcrypt.compare(senha, usuario.senha_hash))) return null;
+    const usuario = await database.get(
+        'SELECT cd_id_user, nm_user AS nome, ds_email AS email, ds_password_hash AS password_hash FROM users WHERE ds_email = ?',
+        [email]
+    );
+    if (!usuario || !(await bcrypt.compare(senha, usuario.password_hash))) return null;
     if (!jwtSecret) throw new Error('JWT_SECRET não configurado.');
 
     return {
-        token: jwt.sign({ id: usuario.id, email: usuario.email }, jwtSecret, { expiresIn: '7d' }),
+        token: jwt.sign({ id: usuario.cd_id_user, email: usuario.email }, jwtSecret, { expiresIn: '7d' }),
         usuario: { nome: usuario.nome, email: usuario.email }
     };
 }

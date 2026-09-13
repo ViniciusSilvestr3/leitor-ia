@@ -1,5 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const { geminiModel } = require('../config/env');
+const dictionaryService = require('./dictionary.service');
 
 const ai = new GoogleGenAI({});
 const explanationCache = new Map();
@@ -55,11 +56,7 @@ async function generateContent(prompt, config = {}, modelPriority = [geminiModel
                 contents: prompt,
                 config: {
                     ...config,
-                    responseMimeType: config.responseMimeType || 'text/plain',
-                    thinkingConfig: {
-                        includeThoughts: false,
-                        thinkingBudget: 0
-                    }
+                    responseMimeType: config.responseMimeType || 'text/plain'
                 }
             });
             return response.text;
@@ -77,17 +74,26 @@ async function generateContent(prompt, config = {}, modelPriority = [geminiModel
     throw lastError;
 }
 
-async function explainTerm(termo, contexto) {
+async function explainTerm(termo, contexto, idioma = 'pt-BR') {
     const termoLimpo = normalizeText(termo);
     const contextoReduzido = buildRelevantContext(termoLimpo, contexto);
-    const cacheKey = `${termoLimpo.toLowerCase()}::${contextoReduzido.toLowerCase()}`;
+    const idiomaLimpo = normalizeText(idioma) || 'pt-BR';
+    const cacheKey = `${idiomaLimpo.toLowerCase()}::${termoLimpo.toLowerCase()}::${contextoReduzido.toLowerCase()}`;
 
     if (explanationCache.has(cacheKey)) return explanationCache.get(cacheKey);
+
+    const savedExplanation = await dictionaryService.findExplanation(termoLimpo, contextoReduzido, idiomaLimpo);
+    if (savedExplanation) {
+        const result = { ...savedExplanation, origem: 'banco' };
+        explanationCache.set(cacheKey, result);
+        return result;
+    }
 
     const buildPrompt = (mode = 'simple') => {
         if (mode === 'simple') {
             return `Analise uma palavra ou expressão dentro de uma passagem de livro.
 Termo selecionado: "${termoLimpo}"
+Idioma do termo: "${idiomaLimpo}"
 Contexto da passagem: "${contextoReduzido}"
     Responda exclusivamente com JSON válido, sem markdown, usando exatamente estas chaves:
     {"traducao":"...","sentido_no_contexto":"...","papel_na_passagem":"...","parafrase":"..."}
@@ -104,6 +110,7 @@ Contexto da passagem: "${contextoReduzido}"
 
         return `Analise o termo de um livro com base somente no contexto abaixo.
 Termo: "${termoLimpo}"
+Idioma do termo: "${idiomaLimpo}"
 Contexto: "${contextoReduzido}"
     Responda exclusivamente com JSON válido, sem markdown, usando estas chaves: traducao, sentido_no_contexto, papel_na_passagem, parafrase. Seja claro, contextual e não invente informações.`;
     };
@@ -144,8 +151,10 @@ Contexto: "${contextoReduzido}"
         };
     }
 
-    explanationCache.set(cacheKey, explanation);
-    return explanation;
+    await dictionaryService.saveExplanation(termoLimpo, contextoReduzido, explanation, idiomaLimpo);
+    const result = { ...explanation, origem: 'ia' };
+    explanationCache.set(cacheKey, result);
+    return result;
 }
 
 async function generateQuiz(rows) {
