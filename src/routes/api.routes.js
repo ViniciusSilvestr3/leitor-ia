@@ -9,6 +9,7 @@ const uploadController = require('../controllers/upload.controller');
 const router = express.Router();
 router.use('/auth', authRoutes);
 router.post('/upload', authenticateToken, upload.single('livro'), uploadController.upload);
+router.get('/uploads/:filename', authenticateToken, uploadController.download);
 router.post('/explicar', authenticateToken, aiController.explain);
 router.post('/flashcards/salvar', authenticateToken, flashcardController.save);
 router.delete('/flashcards/:id', authenticateToken, flashcardController.remove);

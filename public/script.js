@@ -12,6 +12,7 @@ let tituloLivroAtual = "Livro Desconhecido";
 let cfiAtual = "";
 let pdfAtual = null;
 let paginaPdfAtual = 1;
+let currentFileObjectUrl = null;
 // ==========================================
 // MODO NOTURNO
 // ==========================================
@@ -170,7 +171,7 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
             body: formData
         });
         const data = await response.json();
-        if (response.ok) renderizarLivro(data.caminho, data.formato);
+        if (response.ok) renderizarLivro(data.caminho, data.formato).catch(error => alert(error.message));
         else alert("Erro: " + data.erro);
     } catch (error) {
         console.error("Erro no upload:", error);
@@ -186,9 +187,21 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
 // ==========================================
 // 3. RENDERIZAR O LIVRO E IA (COM PROGRESSO E CLIQUES)
 // ==========================================
-function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'epub') {
+async function obterArquivoAutenticado(caminhoUrl) {
+    const token = localStorage.getItem('token');
+    const response = await fetch(caminhoUrl, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Não foi possível carregar o arquivo.');
+
+    if (currentFileObjectUrl) URL.revokeObjectURL(currentFileObjectUrl);
+    currentFileObjectUrl = URL.createObjectURL(await response.blob());
+    return currentFileObjectUrl;
+}
+
+async function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith('.pdf') ? 'pdf' : 'epub') {
     if (formato === 'pdf') {
-        renderizarPdf(caminhoUrl);
+        await renderizarPdf(caminhoUrl);
         return;
     }
 
@@ -198,7 +211,7 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
     document.getElementById('pdf-controls').style.display = 'none';
     document.getElementById('epub-controls-hint').style.display = 'block';
     document.getElementById('pdf-page-counter').innerText = 'Página 1';
-    const urlCompleta = window.location.origin + caminhoUrl;
+    const urlCompleta = await obterArquivoAutenticado(caminhoUrl);
     
     if (currentRendition) currentRendition.destroy();
     document.getElementById('viewer').innerHTML = ''; 
@@ -215,7 +228,7 @@ function renderizarLivro(caminhoUrl, formato = caminhoUrl.toLowerCase().endsWith
         spread: "none",
         flow: "paginated",     
         manager: "continuous", 
-        allowScriptedContent: true 
+        allowScriptedContent: false
     });
 
     // Registra os temas DENTRO do iframe do livro
@@ -346,7 +359,8 @@ async function renderizarPdf(caminhoUrl) {
     document.getElementById('pdf-page-counter').innerText = 'Página 1';
 
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    pdfAtual = await pdfjsLib.getDocument(window.location.origin + caminhoUrl).promise;
+    const urlArquivo = await obterArquivoAutenticado(caminhoUrl);
+    pdfAtual = await pdfjsLib.getDocument(urlArquivo).promise;
     tituloLivroAtual = caminhoUrl.split('/').pop() || 'Livro PDF';
     paginaPdfAtual = 1;
     await renderizarPaginaPdf(paginaPdfAtual);
@@ -661,28 +675,44 @@ async function carregarVocabulario() {
             }, {});
 
             for (const [livro, cards] of Object.entries(agrupados)) {
-                let htmlGrupo = `
-                <div class="livro-grupo">
-                    <h3 class="livro-titulo-grupo">📖 ${livro}</h3>
-                    <div class="vocab-grid">`;
-                
+                const grupo = document.createElement('div');
+                grupo.className = 'livro-grupo';
+                const tituloGrupo = document.createElement('h3');
+                tituloGrupo.className = 'livro-titulo-grupo';
+                tituloGrupo.textContent = `📖 ${livro}`;
+                const grade = document.createElement('div');
+                grade.className = 'vocab-grid';
+
                 cards.forEach(card => {
-                    // É AQUI DENTRO QUE DESENHAMOS O CARD E O BOTÃO AZUL:
-                    htmlGrupo += `
-                        <div class="vocab-card" id="card-${card.id}">
-                            <strong>${card.termo_original}</strong>
-                            <i>"${card.frase_contexto}"</i>
-                            <p>${card.explicacao_ia}</p>
-                            
-                            <div class="card-actions">
-                                <button onclick="irParaGrifo('${card.cfi}')" class="btn-text">Ver no Livro</button>
-                                <button onclick="deletarFlashcard(${card.id})" class="btn-text danger">Excluir</button>
-                            </div>
-                        </div>`;
+                    const cardElement = document.createElement('div');
+                    cardElement.className = 'vocab-card';
+                    cardElement.id = `card-${card.id}`;
+
+                    const termElement = document.createElement('strong');
+                    termElement.textContent = card.termo_original || '';
+                    const contextElement = document.createElement('i');
+                    contextElement.textContent = `"${card.frase_contexto || ''}"`;
+                    const explanationElement = document.createElement('p');
+                    explanationElement.textContent = card.explicacao_ia || '';
+
+                    const actions = document.createElement('div');
+                    actions.className = 'card-actions';
+                    const highlightButton = document.createElement('button');
+                    highlightButton.className = 'btn-text';
+                    highlightButton.textContent = 'Ver no Livro';
+                    highlightButton.addEventListener('click', () => window.irParaGrifo(card.cfi));
+                    const deleteButton = document.createElement('button');
+                    deleteButton.className = 'btn-text danger';
+                    deleteButton.textContent = 'Excluir';
+                    deleteButton.addEventListener('click', () => window.deletarFlashcard(card.id));
+
+                    actions.append(highlightButton, deleteButton);
+                    cardElement.append(termElement, contextElement, explanationElement, actions);
+                    grade.appendChild(cardElement);
                 });
-                
-                htmlGrupo += `</div></div>`;
-                lista.innerHTML += htmlGrupo;
+
+                grupo.append(tituloGrupo, grade);
+                lista.appendChild(grupo);
             }
         }
     } catch (error) { lista.innerHTML = `<p style="color: red; text-align: center;">Erro de conexão.</p>`; }

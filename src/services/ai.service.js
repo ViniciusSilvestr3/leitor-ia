@@ -5,6 +5,15 @@ const dictionaryService = require('./dictionary.service');
 const ai = new GoogleGenAI({});
 const explanationCache = new Map();
 const MAX_CONTEXT_LENGTH = 1400;
+const MAX_CACHE_ENTRIES = 1000;
+
+function cacheExplanation(key, value) {
+    if (explanationCache.size >= MAX_CACHE_ENTRIES && !explanationCache.has(key)) {
+        const oldestKey = explanationCache.keys().next().value;
+        explanationCache.delete(oldestKey);
+    }
+    explanationCache.set(key, value);
+}
 
 function normalizeText(value = '') {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -85,7 +94,7 @@ async function explainTerm(termo, contexto, idioma = 'pt-BR') {
     const savedExplanation = await dictionaryService.findExplanation(termoLimpo, contextoReduzido, idiomaLimpo);
     if (savedExplanation) {
         const result = { ...savedExplanation, origem: 'banco' };
-        explanationCache.set(cacheKey, result);
+        cacheExplanation(cacheKey, result);
         return result;
     }
 
@@ -153,7 +162,7 @@ Contexto: "${contextoReduzido}"
 
     await dictionaryService.saveExplanation(termoLimpo, contextoReduzido, explanation, idiomaLimpo);
     const result = { ...explanation, origem: 'ia' };
-    explanationCache.set(cacheKey, result);
+    cacheExplanation(cacheKey, result);
     return result;
 }
 

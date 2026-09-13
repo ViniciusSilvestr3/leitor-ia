@@ -23,18 +23,21 @@ O comando instala o backend, o SQLite, a integração com o Gemini e as demais d
 
 ## 2. Configurar as variáveis de ambiente
 
-Crie um arquivo chamado `.env` na raiz do projeto, no mesmo nível de `server.js`:
+Copie `.env.example` para `.env` na raiz do projeto, no mesmo nível de `server.js`:
 
 ```env
 GEMINI_API_KEY=sua_chave_do_gemini
 JWT_SECRET=uma_chave_secreta_longa_e_aleatoria
-PORT=3000
-DATABASE_PATH=./banco.sqlite
-UPLOADS_PATH=./uploads
-GEMINI_MODEL=gemini-2.5-flash
 ```
 
 `GEMINI_API_KEY` é usado pelo pacote do Google para autenticar as chamadas de IA. `JWT_SECRET` é usado para assinar os tokens de login e deve ser mantido privado.
+
+Essas são as únicas variáveis obrigatórias. A aplicação usa os seguintes valores padrão para as demais configurações:
+
+- Porta: `3000`.
+- Banco: `banco.sqlite`.
+- Uploads: `uploads/`.
+- Modelo Gemini: `gemini-3.6-flash`.
 
 Não coloque o conteúdo real do `.env` no GitHub ou em mensagens. Cada desenvolvedor deve criar o próprio arquivo localmente.
 
@@ -65,7 +68,7 @@ Para desligar a aplicação, volte ao terminal onde ela está rodando e pression
 
 ## 4. Como o SQLite funciona
 
-Na primeira inicialização, o backend cria automaticamente o arquivo definido em `DATABASE_PATH`. Por padrão, ele será:
+Na primeira inicialização, o backend cria automaticamente o arquivo `banco.sqlite`:
 
 ```text
 banco.sqlite
@@ -73,8 +76,17 @@ banco.sqlite
 
 Também são criadas automaticamente as tabelas:
 
-- `usuarios`: contas, e-mails e hashes das senhas.
+- `users`: contas, e-mails e hashes das senhas.
 - `flashcards`: palavras salvas, contexto, explicação, livro e posição no EPUB.
+- `dictionary`: explicações armazenadas para evitar chamadas repetidas à IA.
+
+Os campos do banco seguem uma convenção de prefixos:
+
+- `cd_`: códigos e identificadores.
+- `nm_`: nomes e títulos.
+- `ds_`: textos, descrições e valores de conteúdo.
+- `dt_`: datas e horários.
+- `tp_`: tipos ou categorias.
 
 Depois disso, o fluxo normal é:
 
@@ -85,16 +97,16 @@ Depois disso, o fluxo normal é:
 5. Salvar a explicação como flashcard.
 6. Abrir a aba de vocabulário ou iniciar o minigame.
 
-O arquivo SQLite é persistente: parar e iniciar o servidor não apaga os usuários nem os flashcards. Os EPUBs e PDFs enviados ficam em `uploads/`.
+O arquivo SQLite é persistente: parar e iniciar o servidor não apaga os usuários nem os flashcards. Os EPUBs e PDFs enviados ficam em `uploads/` e só podem ser baixados por requisições autenticadas.
 
 ### EPUB e PDF
 
 O sistema mantém os arquivos originais e escolhe o leitor automaticamente:
 
-- EPUB usa `epub.js`.
+- EPUB usa `epub.js` com scripts internos desativados por segurança.
 - PDF usa `PDF.js` e permite selecionar texto sobre as páginas.
 
-PDFs que são apenas imagens, como documentos escaneados, podem não ter texto selecionável. Para esses arquivos será necessário adicionar OCR em uma etapa futura.
+PDFs que são apenas imagens, como documentos escaneados, usam OCR no navegador para tentar criar uma camada de texto selecionável.
 
 ### Consultar o banco manualmente (opcional)
 
@@ -108,8 +120,8 @@ Dentro do console SQLite:
 
 ```sql
 .tables
-SELECT id, nome, email FROM usuarios;
-SELECT id, usuario_id, termo_original, livro_titulo FROM flashcards;
+SELECT cd_id_user, nm_user, ds_email FROM users;
+SELECT cd_id_flashcard, cd_id_user, ds_original_term, nm_book_title FROM flashcards;
 .quit
 ```
 
@@ -147,23 +159,13 @@ As rotas protegidas exigem o cabeçalho `Authorization` no formato `Bearer <toke
 
 ## Problemas comuns
 
-### `GEMINI_API_KEY` não configurada
+### `GEMINI_API_KEY` ou `JWT_SECRET` não configurada
 
 Confira se o arquivo `.env` existe na raiz e se contém uma chave válida. Reinicie o servidor depois de alterar o arquivo.
 
-### Porta 3000 ocupada
-
-Altere a porta no `.env`:
-
-```env
-PORT=3001
-```
-
-Depois, acesse `http://localhost:3001`.
-
 ### Banco não inicia
 
-Confira se a pasta do projeto permite criar arquivos. Se `DATABASE_PATH` apontar para outra pasta, essa pasta também precisa existir e ter permissão de escrita.
+Confira se a pasta do projeto permite criar o arquivo `banco.sqlite` e se o arquivo não está sendo usado por outro processo.
 
 ### Upload rejeitado
 
@@ -173,9 +175,11 @@ O backend aceita somente arquivos com extensão `.epub` ou `.pdf`. O limite atua
 
 Cada consulta ao Gemini consome tokens de entrada e de saída. Para reduzir o custo, o backend atualmente:
 
-- limita o contexto enviado a 2.400 caracteres;
-- pede uma resposta com no máximo 80 palavras;
+- limita o contexto enviado a 1.400 caracteres;
+- limita a resposta da IA a 240 tokens;
 - reutiliza a resposta em memória quando o mesmo termo é consultado no mesmo contexto;
 - mantém o prompt direto, sem enviar o livro inteiro.
+
+As requisições possuem limites de tamanho e rate limit para reduzir brute force, abuso da API e consumo excessivo de memória. Uploads são limitados a 50 MB e aceitam somente arquivos `.epub` ou `.pdf`.
 
 O cache fica na memória do processo e é perdido quando o servidor é reiniciado. O flashcard salvo continua no SQLite, mas uma nova consulta à IA poderá consumir tokens novamente. No futuro, podemos persistir traduções reutilizáveis no banco e evitar novas chamadas mesmo depois de reiniciar o servidor.
