@@ -10,6 +10,9 @@ let contextoAtual = "";
 let explicacaoAtual = "";
 let tituloLivroAtual = "Livro Desconhecido";
 let cfiAtual = "";
+let pdfAtual = null;
+let pdfPaginaAtual = 1;
+let pdfRenderizando = false;
 // ==========================================
 // MODO NOTURNO
 // ==========================================
@@ -150,30 +153,61 @@ btnAuthAction.addEventListener('click', async () => {
 // 2. UPLOAD DO LIVRO
 // ==========================================
 document.getElementById('uploadBtn').addEventListener('click', async () => {
-    const fileInput = document.getElementById('epubInput');
+    const fileInput = document.getElementById('bookInput');
     const file = fileInput.files[0];
 
     if (!file) { alert("Selecione um arquivo .epub primeiro!"); return; }
-    
-    const token = localStorage.getItem('token');
-    if (!token) { alert("Você precisa estar logado."); return; }
-
-    const formData = new FormData();
-    formData.append('livro', file);
 
     try {
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-        const data = await response.json();
-        if (response.ok) renderizarLivro(data.caminho);
-        else alert("Erro: " + data.erro);
+        const conteudoLivro = await file.arrayBuffer();
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+            renderizarPdf(conteudoLivro);
+        } else {
+            renderizarLivro(conteudoLivro);
+        }
     } catch (error) {
-        console.error("Erro no upload:", error);
+        console.error("Erro ao ler o EPUB no navegador:", error);
+        alert("Não foi possível abrir o arquivo EPUB.");
     }
 });
+
+async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
+    const token = localStorage.getItem('token');
+
+    document.getElementById('modalOverlay').style.display = 'block';
+    document.getElementById('termo-box').innerText = textoSelecionado;
+    document.getElementById('traducao-box').innerText = '';
+    document.getElementById('explicacao-box').innerText = "Analisando contexto...";
+    document.getElementById('btnSalvarCard').style.display = 'none';
+
+    try {
+        const response = await fetch('/api/explicar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ termo: textoSelecionado, contexto, livro_titulo: tituloLivroAtual, cfi })
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            const vocabulario = data.explicacao;
+            document.getElementById('termo-box').innerText = vocabulario.termo_base;
+            document.getElementById('traducao-box').innerText = vocabulario.traducao;
+            document.getElementById('explicacao-box').innerText = vocabulario.explicacao;
+            termoAtual = vocabulario.termo_base;
+            contextoAtual = contexto;
+            explicacaoAtual = vocabulario.explicacao;
+            cfiAtual = cfi;
+
+            const btnSalvar = document.getElementById('btnSalvarCard');
+            btnSalvar.style.display = 'none';
+        } else {
+            document.getElementById('traducao-box').innerText = '';
+            document.getElementById('explicacao-box').innerText = "Erro: " + data.erro;
+        }
+    } catch (error) {
+        document.getElementById('explicacao-box').innerText = "Erro de conexão com a API.";
+    }
+}
 
 // ==========================================
 // 3. RENDERIZAR O LIVRO E IA
@@ -184,13 +218,11 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
 // ==========================================
 // 3. RENDERIZAR O LIVRO E IA (COM PROGRESSO E CLIQUES)
 // ==========================================
-function renderizarLivro(caminhoUrl) {
-    const urlCompleta = window.location.origin + caminhoUrl;
-    
+function renderizarLivro(conteudoLivro) {
     if (currentRendition) currentRendition.destroy();
     document.getElementById('viewer').innerHTML = ''; 
     
-    const book = ePub(urlCompleta);
+    const book = ePub(conteudoLivro);
     
     book.ready.then(() => {
         tituloLivroAtual = book.package.metadata.title || "Livro Desconhecido";
@@ -277,39 +309,96 @@ function renderizarLivro(caminhoUrl) {
                 contents.window.getSelection().removeAllRanges();
                 currentRendition.annotations.highlight(cfiRange, {}, (e) => {});
                 
-                const token = localStorage.getItem('token');
-                
-                document.getElementById('modalOverlay').style.display = 'block';
-                document.getElementById('termo-box').innerText = textoSelecionado;
-                document.getElementById('explicacao-box').innerText = "Analisando contexto...";
-                document.getElementById('btnSalvarCard').style.display = 'none';
-
-                try {
-                    const response = await fetch('/api/explicar', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ termo: textoSelecionado, contexto: paragrafoContexto })
-                    });
-                    const data = await response.json();
-                    
-                    if (response.ok) {
-                        document.getElementById('explicacao-box').innerText = data.explicacao;
-                        termoAtual = textoSelecionado; contextoAtual = paragrafoContexto; explicacaoAtual = data.explicacao; cfiAtual = cfiRange; 
-                        
-                        const btnSalvar = document.getElementById('btnSalvarCard');
-                        btnSalvar.style.display = 'block'; 
-                        btnSalvar.innerText = "Salvar Palavra";
-                        btnSalvar.disabled = false; 
-                    } else {
-                        document.getElementById('explicacao-box').innerText = "Erro: " + data.erro;
-                    }
-                } catch (error) {
-                    document.getElementById('explicacao-box').innerText = "Erro de conexão com a API.";
-                }
+                await solicitarExplicacao(textoSelecionado, paragrafoContexto, cfiRange);
             }
         }, 400);
     });
 }
+
+async function renderizarPdf(conteudoPdf) {
+    if (currentRendition) currentRendition.destroy();
+    document.getElementById('viewer').innerHTML = '<div id="pdfViewer"></div>';
+    document.getElementById('pdf-controls').style.display = 'flex';
+    pdfPaginaAtual = 1;
+    tituloLivroAtual = "Documento PDF";
+
+    try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfAtual = await pdfjsLib.getDocument({ data: conteudoPdf }).promise;
+        await renderizarPaginaPdf(pdfPaginaAtual);
+    } catch (error) {
+        console.error("Erro ao abrir o PDF:", error);
+        document.getElementById('viewer').innerText = "Não foi possível abrir o arquivo PDF.";
+    }
+}
+
+async function renderizarPaginaPdf(numeroPagina) {
+    if (!pdfAtual || pdfRenderizando) return;
+    pdfRenderizando = true;
+
+    try {
+        const pagina = await pdfAtual.getPage(numeroPagina);
+        const escala = Math.min((document.getElementById('viewer').clientWidth - 40) / pagina.getViewport({ scale: 1 }).width, 1.5);
+        const viewport = pagina.getViewport({ scale: Math.max(escala, 0.5) });
+        const pdfViewer = document.getElementById('pdfViewer');
+        pdfViewer.innerHTML = '';
+
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'pdf-page';
+        pageContainer.style.width = `${viewport.width}px`;
+        pageContainer.style.height = `${viewport.height}px`;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        pageContainer.appendChild(canvas);
+
+        const textLayer = document.createElement('div');
+        textLayer.className = 'pdf-text-layer';
+        textLayer.style.width = `${viewport.width}px`;
+        textLayer.style.height = `${viewport.height}px`;
+        pageContainer.appendChild(textLayer);
+        pdfViewer.appendChild(pageContainer);
+
+        await pagina.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const textContent = await pagina.getTextContent();
+        const textDivs = [];
+        const renderTextLayerTask = pdfjsLib.renderTextLayer({
+            textContent,
+            container: textLayer,
+            viewport,
+            textDivs,
+        });
+        if (renderTextLayerTask.promise) await renderTextLayerTask.promise;
+
+        textLayer.addEventListener('mouseup', () => {
+            const selecao = textLayer.ownerDocument.getSelection().toString().trim();
+            if (!selecao) return;
+            const contexto = textContent.items.map(item => item.str).join(' ').trim();
+            solicitarExplicacao(selecao, contexto);
+        });
+
+        document.getElementById('pdf-page-number').innerText = `Página ${numeroPagina} de ${pdfAtual.numPages}`;
+    } catch (error) {
+        console.error("Erro ao renderizar página do PDF:", error);
+    } finally {
+        pdfRenderizando = false;
+    }
+}
+
+document.getElementById('pdf-prev').addEventListener('click', () => {
+    if (pdfAtual && pdfPaginaAtual > 1) {
+        pdfPaginaAtual--;
+        renderizarPaginaPdf(pdfPaginaAtual);
+    }
+});
+
+document.getElementById('pdf-next').addEventListener('click', () => {
+    if (pdfAtual && pdfPaginaAtual < pdfAtual.numPages) {
+        pdfPaginaAtual++;
+        renderizarPaginaPdf(pdfPaginaAtual);
+    }
+});
 
 // ==========================================
 // 4. SALVAR FLASHCARD NO BANCO E FECHAR MODAL
@@ -356,21 +445,6 @@ const modalOverlay = document.getElementById('modalOverlay');
 function fecharModal() { modalOverlay.style.display = 'none'; }
 document.getElementById('closeModal').addEventListener('click', fecharModal);
 modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) fecharModal(); });
-
-// ==========================================
-// 6. NAVEGAÇÃO DE PÁGINAS DO LEITOR
-// ==========================================
-document.getElementById('prevBtn').addEventListener('click', () => {
-    if (currentRendition) currentRendition.prev();
-});
-document.getElementById('nextBtn').addEventListener('click', () => {
-    if (currentRendition) currentRendition.next();
-});
-document.addEventListener('keyup', (e) => {
-    if (!currentRendition) return; 
-    if (e.key === 'ArrowLeft') currentRendition.prev();
-    if (e.key === 'ArrowRight') currentRendition.next();
-});
 
 // ==========================================
 // 7. NAVEGAÇÃO E ABAS (Leitor vs Vocabulário)

@@ -49,7 +49,14 @@
         .btn-primary { background: var(--primary); color: var(--surface); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
         .btn-primary:hover { opacity: 0.9; }
         
-        #viewer { flex-grow: 1; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); height: 70vh; transition: background-color 0.3s; }
+        #viewer { flex-grow: 1; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); height: 70vh; transition: background-color 0.3s; overflow: auto; }
+        #pdfViewer { min-height: 100%; padding: 20px; box-sizing: border-box; }
+        .pdf-page { position: relative; width: fit-content; margin: 0 auto; background: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
+        .pdf-page canvas { display: block; }
+        .pdf-text-layer { position: absolute; inset: 0; overflow: hidden; opacity: 0.2; line-height: 1; }
+        .pdf-text-layer span { position: absolute; white-space: pre; transform-origin: 0 0; color: transparent; cursor: text; }
+        .pdf-text-layer ::selection { background: rgba(52, 152, 219, 0.35); }
+        .pdf-controls { display: none; justify-content: center; align-items: center; gap: 12px; margin-top: 10px; color: var(--text-muted); }
 
         /* Vocabulário */
         .livro-grupo { margin-bottom: 40px; }
@@ -74,6 +81,7 @@
         .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--primary); }
         .close-btn { cursor: pointer; color: var(--text-muted); font-size: 1.5rem; line-height: 1; }
         #termo-box { font-size: 1.1rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
+        #traducao-box { font-size: 1.05rem; font-weight: 600; color: var(--primary); margin-bottom: 12px; }
         #explicacao-box { font-size: 0.95rem; line-height: 1.6; color: var(--text); margin-bottom: 25px; }
 
         /* Autenticação (Mantida simples) */
@@ -112,10 +120,15 @@
         
         <div id="screen-reader" class="sub-screen container-leitor">
             <div class="upload-bar">
-                <input type="file" id="epubInput" accept=".epub">
+                <input type="file" id="bookInput" accept=".epub,.pdf,application/epub+zip,application/pdf">
                 <button id="uploadBtn" class="btn-primary">Abrir Arquivo</button>
             </div>
             <div id="viewer"></div>
+            <div id="pdf-controls" class="pdf-controls">
+                <button id="pdf-prev" class="btn-outline" type="button">Página anterior</button>
+                <span id="pdf-page-number">Página 1</span>
+                <button id="pdf-next" class="btn-outline" type="button">Próxima página</button>
+            </div>
             <div id="controls" style="display: none; text-align: center; margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;">
                 Clique nas laterais da tela para mudar de página.
             </div>
@@ -161,6 +174,7 @@
                     <span id="closeModal" class="close-btn">&times;</span>
                 </div>
                 <div id="termo-box"></div>
+                <div id="traducao-box"></div>
                 <div id="explicacao-box"></div>
                 <button id="btnSalvarCard" class="btn-primary" style="width: 100%; display: none;">Salvar Palavra</button>
             </div>
@@ -169,6 +183,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="script.js"></script>
 </body>
 <script>
