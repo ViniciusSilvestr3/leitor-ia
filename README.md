@@ -138,30 +138,3 @@ O SQLite possui duas tabelas:
 
 O `usuario_id` relaciona cada flashcard ao usuário que o criou. O CFI é usado pelo frontend para tentar retornar à posição do termo no livro aberto.
 
-## Regras de negócio relevantes
-
-As regras completas estão em [RdN.md](RdN.md). Os pontos principais são:
-
-- Não adicionar suporte a PDF nesta fase.
-- Manter o prompt original da IA quando a lógica for extraída.
-- Ler `GEMINI_API_KEY` somente por `process.env` e nunca enviá-la ao frontend.
-- A chamada ao Gemini está concentrada em `src/services/geminiService.js`.
-- O processamento do livro ocorre no frontend; o backend recebe somente JSON com termo e contexto.
-- Usar CommonJS, seguindo o padrão atual.
-- Proteger novas integrações com a IA usando `try/catch`.
-
-## Pendências e divergências conhecidas
-
-Estas observações descrevem o código atual e não representam novas funcionalidades:
-
-- `style.css` está vazio; os estilos da interface estão em um bloco `<style>` dentro de `public/index.html`.
-- A função global `deletarFlashcard` está declarada duas vezes; a segunda definição substitui a primeira.
-- O projeto não possui testes automatizados configurados. O script `npm test` ainda retorna a mensagem padrão de teste não configurado.
-- Não existe script `start` no `package.json`; o servidor é iniciado diretamente com `node server.js`.
-
-## Segurança e operação
-
-- O arquivo `.env` não deve ser versionado; ele está listado no `.gitignore`.
-- Nunca coloque `GEMINI_API_KEY` no HTML ou no JavaScript público.
-- `banco.sqlite` e os arquivos em `uploads/` são dados locais do protótipo.
-- Arquivos EPUB existentes em `uploads/` são dados legados do protótipo; a aplicação não cria novos uploads físicos no backend.
