@@ -152,11 +152,11 @@ btnAuthAction.addEventListener('click', async () => {
 // ==========================================
 // 2. UPLOAD DO LIVRO
 // ==========================================
-document.getElementById('uploadBtn').addEventListener('click', async () => {
+async function abrirArquivoSelecionado() {
     const fileInput = document.getElementById('bookInput');
     const file = fileInput.files[0];
 
-    if (!file) { alert("Selecione um arquivo .epub primeiro!"); return; }
+    if (!file) return;
 
     try {
         const conteudoLivro = await file.arrayBuffer();
@@ -166,10 +166,12 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
             renderizarLivro(conteudoLivro);
         }
     } catch (error) {
-        console.error("Erro ao ler o EPUB no navegador:", error);
-        alert("Não foi possível abrir o arquivo EPUB.");
+        console.error("Erro ao ler o arquivo no navegador:", error);
+        alert("Não foi possível abrir o arquivo.");
     }
-});
+}
+
+document.getElementById('bookInput').addEventListener('change', abrirArquivoSelecionado);
 
 async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
     const token = localStorage.getItem('token');
@@ -220,6 +222,10 @@ async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
 // ==========================================
 function renderizarLivro(conteudoLivro) {
     if (currentRendition) currentRendition.destroy();
+    pdfAtual = null;
+    pdfPaginaAtual = 1;
+    pdfRenderizando = false;
+    document.getElementById('pdf-controls').style.display = 'none';
     document.getElementById('viewer').innerHTML = ''; 
     
     const book = ePub(conteudoLivro);
@@ -317,6 +323,7 @@ function renderizarLivro(conteudoLivro) {
 
 async function renderizarPdf(conteudoPdf) {
     if (currentRendition) currentRendition.destroy();
+    document.getElementById('controls').style.display = 'none';
     document.getElementById('viewer').innerHTML = '<div id="pdfViewer"></div>';
     document.getElementById('pdf-controls').style.display = 'flex';
     pdfPaginaAtual = 1;

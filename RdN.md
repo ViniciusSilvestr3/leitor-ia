@@ -45,7 +45,14 @@ REGRA NUMERO 4: Fases com o (Completa) Devem ser entendidas como terminada e pod
 - **Renderização:** O script deve carregar o PDF em um elemento `<canvas>` (Camada Visual) e obrigatoriamente instanciar a `TextLayer` (Camada de Texto invisível) sobreposta a ele.
 - **Integração:** A seleção de palavras pelo usuário na `TextLayer` deve capturar o texto e acionar a mesma função JavaScript já existente da Fase 1, enviando o payload JSON (palavra + contexto) para as rotas atuais do Express. Não modifique os controllers ou services do backend.
 
-## Fase 3: Engenharia de Prompt e Padronização JSON
+## Fase 3: Engenharia de Prompt e Padronização JSON (Quase completa)
 - **Objetivo:** Garantir que todas as respostas do Gemini sejam objetos JSON para facilitar a persistência no banco SQLite e a renderização no frontend.
 - **Regra de Integração (Backend):** Utilizar a configuração `config: { responseMimeType: "application/json" }` no SDK `@google/genai` para forçar o retorno estruturado, eliminando limpezas manuais de string com regex.
 - **Regra de Interface (Frontend):** O frontend deve ser atualizado para ler e exibir os atributos isolados do JSON (`termo_base`, `traducao`, `explicacao`) em vez de renderizar um texto bruto.
+
+## Fase 4: Migração do Frontend para React (Completa)
+- **Objetivo:** Substituir a interface em JavaScript puro por uma aplicação React (componentizada), mantendo a API do Express rigorosamente intacta.
+- **Regra de Arquitetura (Backend Intocável):** As pastas `src/routes`, `controllers`, e `services` (incluindo o Gemini e SQLite) NÃO DEVEM sofrer nenhuma alteração nesta fase.
+- **Estrutura de Diretórios:** O código React deve ser criado em um diretório isolado (ex: `/frontend` ou `/client`) para separar as responsabilidades do servidor Express.
+- **Regra de Componentização:** A lógica de renderização (PDF.js e epub.js) deve ser encapsulada utilizando hooks (`useEffect`, `useRef`).
+- **Estados:** Utilizar o React para controlar de forma reativa o texto selecionado, o *loading* da IA e a exibição dos dados formatados (termo_base, traducao_direta, analise_literaria).

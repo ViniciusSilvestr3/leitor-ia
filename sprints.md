@@ -65,3 +65,31 @@ Este arquivo registra as principais mudanças realizadas no projeto por fase e p
 - Atualizado o modal para exibir o termo base, a tradução como título e a explicação no corpo em elementos separados.
 - A persistência passou a ocorrer na consulta à IA; o botão de salvamento manual foi ocultado para evitar registros duplicados.
 - Nenhuma alteração nos prompts ou na implementação do `geminiService.js`.
+
+## 2026-09-26
+
+### Fase 4: Componentes centrais de leitura e análise em React
+
+- Criados `ReaderScreen`, `PdfReader`, `EpubReader` e `AiAnalysisModal` em `frontend/src/components`.
+- Implementado processamento local de arquivos EPUB e PDF, sem envio do arquivo físico ao backend.
+- Implementada seleção de texto e captura do contexto para EPUB e PDF.
+- Integrada a análise contextual com `POST /api/explicar`, mantendo o contrato JSON com `traducao` e `explicacao`.
+- Integrado o `ReaderScreen` ao `AppLayout` e substituído o scaffold visual do Vite.
+- Nenhuma alteração realizada nas rotas, controllers ou services do backend.
+
+## 2026-09-28
+
+### Fase 4: Revisão e validação do frontend React
+
+- Revisados os componentes centrais de leitura e análise da Fase 4.
+- Corrigidos efeitos React 19 que causavam erro no lint por atualizarem estado de forma síncrona.
+- Garantida a remontagem limpa dos leitores ao trocar o arquivo selecionado.
+- Confirmado o processamento local de EPUB e PDF e a integração do modal com `api.js`.
+- Executados `npm run lint` e `npm run build` com sucesso no frontend.
+- Confirmado que as rotas, controllers, services e middleware do backend permaneceram inalterados.
+- Corrigido o alinhamento da `TextLayer` do PDF.js com o canvas usando as variáveis de escala exigidas pela versão atual.
+- Melhorada a seleção de palavras e frases no PDF com seleção nativa e captura após a conclusão do `mouseup`.
+- Build e lint executados novamente após a correção da seleção de PDF.
+- Automatizada a abertura de EPUB e PDF na interface pública ao selecionar o arquivo, removendo a necessidade do botão `Abrir Arquivo`.
+- Corrigida a troca entre formatos para esconder os controles de paginação do PDF ao abrir um EPUB.
+- Resetado o estado do PDF ao trocar para EPUB, evitando que a paginação anterior permaneça ativa.
