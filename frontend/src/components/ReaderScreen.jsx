@@ -3,7 +3,7 @@ import AiAnalysisModal from './AiAnalysisModal.jsx'
 import EpubReader from './EpubReader.jsx'
 import PdfReader from './PdfReader.jsx'
 
-function ReaderScreen({ isDarkMode }) {
+function ReaderScreen({ isDarkMode, idiomaDestino }) {
   const [selectedFile, setSelectedFile] = useState(null)
   const [fileError, setFileError] = useState('')
   const [selection, setSelection] = useState(null)
@@ -90,7 +90,11 @@ function ReaderScreen({ isDarkMode }) {
         )}
       </div>
 
-      <AiAnalysisModal selection={selection} onClose={() => setSelection(null)} />
+      <AiAnalysisModal
+        selection={selection}
+        idiomaDestino={idiomaDestino}
+        onClose={() => setSelection(null)}
+      />
     </section>
   )
 }

@@ -18,6 +18,12 @@ let pdfRenderizando = false;
 // ==========================================
 let isDarkMode = localStorage.getItem('theme') === 'dark';
 const btnThemeToggle = document.getElementById('btnThemeToggle');
+const idiomaDestinoSelect = document.getElementById('idiomaDestino');
+
+idiomaDestinoSelect.value = localStorage.getItem('idiomaDestino') || 'Português';
+idiomaDestinoSelect.addEventListener('change', () => {
+    localStorage.setItem('idiomaDestino', idiomaDestinoSelect.value);
+});
 
 function aplicarTema() {
     if (isDarkMode) {
@@ -175,6 +181,7 @@ document.getElementById('bookInput').addEventListener('change', abrirArquivoSele
 
 async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
     const token = localStorage.getItem('token');
+    const idiomaDestino = idiomaDestinoSelect.value;
 
     document.getElementById('modalOverlay').style.display = 'block';
     document.getElementById('termo-box').innerText = textoSelecionado;
@@ -186,7 +193,7 @@ async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
         const response = await fetch('/api/explicar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ termo: textoSelecionado, contexto, livro_titulo: tituloLivroAtual, cfi })
+            body: JSON.stringify({ termo: textoSelecionado, contexto, livro_titulo: tituloLivroAtual, cfi, idioma_destino: idiomaDestino })
         });
         const data = await response.json();
 

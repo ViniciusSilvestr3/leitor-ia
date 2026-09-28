@@ -56,3 +56,17 @@ REGRA NUMERO 4: Fases com o (Completa) Devem ser entendidas como terminada e pod
 - **Estrutura de Diretórios:** O código React deve ser criado em um diretório isolado (ex: `/frontend` ou `/client`) para separar as responsabilidades do servidor Express.
 - **Regra de Componentização:** A lógica de renderização (PDF.js e epub.js) deve ser encapsulada utilizando hooks (`useEffect`, `useRef`).
 - **Estados:** Utilizar o React para controlar de forma reativa o texto selecionado, o *loading* da IA e a exibição dos dados formatados (termo_base, traducao_direta, analise_literaria).
+
+## Fase 5: Expansão Multi-idioma (Completa)
+- **Objetivo:** Permitir que o usuário defina o idioma de saída para as traduções e explicações da IA.
+- **Frontend (React):** Criar um componente de seleção de idioma e armazenar a preferência no estado da aplicação. O client deve enviar a chave `idioma_destino` no corpo do JSON durante a requisição POST para `/api/explicar`.
+- **Backend (Node.js):** O controller correspondente deve validar e extrair `idioma_destino` do `req.body`.
+- **Inteligência Artificial:** A função `gerarExplicacao` no `geminiService.js` deve receber `idioma_destino` como terceiro parâmetro. O prompt deve ser atualizado com uma diretriz forçando a IA a redigir a `traducao` e a `explicacao` estritamente no idioma especificado.
+- **Banco de Dados (SQLite):** Nenhuma alteração de esquema é necessária, pois a estrutura dos flashcards (`termo_base`, `traducao`, `explicacao`) absorve o idioma resultante naturalmente.
+
+## Fase 6: Refinamento de UI/UX e Tailwind CSS
+- **Objetivo:** Modernizar a interface, melhorar a legibilidade e otimizar o espaço em tela.
+- **Ferramental:** Instalar e configurar o Tailwind CSS no projeto Vite. Adicionar `lucide-react` para iconografia.
+- **VocabularyScreen:** Refatorar os cards de vocabulário. O texto completo do `contexto` deve ficar oculto por padrão (collapsible/accordion), dando destaque absoluto ao termo, tradução e explicação.
+- **Navbar:** Substituir controles textuais secundários (tema, logout) por ícones.
+- **Backend Intocável:** Nenhuma modificação deve ocorrer fora da pasta `/frontend`.

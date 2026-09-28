@@ -93,3 +93,12 @@ Este arquivo registra as principais mudanças realizadas no projeto por fase e p
 - Automatizada a abertura de EPUB e PDF na interface pública ao selecionar o arquivo, removendo a necessidade do botão `Abrir Arquivo`.
 - Corrigida a troca entre formatos para esconder os controles de paginação do PDF ao abrir um EPUB.
 - Resetado o estado do PDF ao trocar para EPUB, evitando que a paginação anterior permaneça ativa.
+
+### Fase 5: Expansão Multi-idioma
+
+- Adicionado o seletor de idioma da explicação com Português, Inglês e Espanhol no frontend React e na interface pública.
+- A preferência de idioma passou a ser persistida localmente e enviada como `idioma_destino` no POST para `/api/explicar`.
+- Atualizado o `aiController.js` para validar os três idiomas permitidos e usar Português como padrão compatível.
+- Atualizado o `geminiService.js` para receber `idioma_destino` e exigir tradução e análise literária estritamente nesse idioma.
+- Mantida a resposta JSON com `responseMimeType: "application/json"` e o esquema atual do banco.
+- Executados lint, build e verificações de sintaxe com sucesso.

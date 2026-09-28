@@ -222,6 +222,24 @@
   gap: 8px;
 }
 
+.language-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  font-size: .8rem;
+  white-space: nowrap;
+}
+
+.language-picker select {
+  border: 1px solid #c8c1b6;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 7px 8px;
+}
+
 .app-navigation {
   flex: 1;
 }

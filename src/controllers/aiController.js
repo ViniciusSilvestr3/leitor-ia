@@ -2,15 +2,21 @@ const geminiService = require('../services/geminiService');
 const databaseService = require('../services/databaseService');
 
 async function explicar(req, res) {
-    const { termo, contexto, livro_titulo, cfi } = req.body;
+    const { termo, contexto, livro_titulo, cfi, idioma_destino } = req.body;
+    const idiomasPermitidos = ['Português', 'Inglês', 'Espanhol'];
+    const idiomaDestino = idioma_destino || 'Português';
 
     if (!termo || !contexto) {
         return res.status(400).json({ erro: 'Dados incompletos.' });
     }
 
+    if (!idiomasPermitidos.includes(idiomaDestino)) {
+        return res.status(400).json({ erro: 'Idioma de explicação inválido.' });
+    }
+
     try {
         console.log(`Usuário ID ${req.usuario.id} está consultando o termo.`);
-        const vocabulario = await geminiService.gerarExplicacao(termo, contexto);
+        const vocabulario = await geminiService.gerarExplicacao(termo, contexto, idiomaDestino);
 
         if (!vocabulario?.termo_base || !vocabulario?.traducao || !vocabulario?.explicacao) {
             return res.status(500).json({ erro: 'A IA retornou um formato de vocabulário inválido.' });

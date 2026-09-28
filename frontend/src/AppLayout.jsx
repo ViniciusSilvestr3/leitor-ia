@@ -4,6 +4,8 @@ function AppLayout({
   onNavigate,
   onThemeToggle,
   onLogout,
+  idiomaDestino,
+  onLanguageChange,
   content,
 }) {
   const navigationItems = [
@@ -32,6 +34,14 @@ function AppLayout({
         </nav>
 
         <div className="app-actions">
+          <label className="language-picker" htmlFor="idioma-destino">
+            Idioma da explicação
+            <select id="idioma-destino" value={idiomaDestino} onChange={onLanguageChange}>
+              <option value="Português">Português</option>
+              <option value="Inglês">Inglês</option>
+              <option value="Espanhol">Espanhol</option>
+            </select>
+          </label>
           <button type="button" onClick={onThemeToggle}>
             {isDarkMode ? 'Modo claro' : 'Modo escuro'}
           </button>

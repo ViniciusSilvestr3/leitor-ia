@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../services/api.js'
 
-function AiAnalysisModal({ selection, onClose }) {
+function AiAnalysisModal({ selection, idiomaDestino, onClose }) {
   const [analysis, setAnalysis] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -21,10 +21,11 @@ function AiAnalysisModal({ selection, onClose }) {
           contexto: selection.contexto,
           livro_titulo: selection.livroTitulo,
           cfi: selection.cfi,
+          idioma_destino: idiomaDestino,
         })
 
         if (!cancelled) {
-          setAnalysis({ selection, result: data.explicacao })
+          setAnalysis({ selection, idiomaDestino, result: data.explicacao })
         }
       } catch (requestError) {
         if (!cancelled) setError(requestError.message)
@@ -38,11 +39,13 @@ function AiAnalysisModal({ selection, onClose }) {
     return () => {
       cancelled = true
     }
-  }, [selection])
+  }, [selection, idiomaDestino])
 
   if (!selection) return null
 
-  const result = analysis?.selection === selection ? analysis.result : null
+  const result = analysis?.selection === selection && analysis.idiomaDestino === idiomaDestino
+    ? analysis.result
+    : null
 
   return (
     <div className="modal-overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>

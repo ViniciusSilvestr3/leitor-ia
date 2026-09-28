@@ -9,6 +9,9 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem('theme') === 'dark',
   )
+  const [idiomaDestino, setIdiomaDestino] = useState(
+    () => localStorage.getItem('idiomaDestino') || 'Português',
+  )
 
   function handleThemeToggle() {
     setIsDarkMode((currentMode) => {
@@ -23,6 +26,12 @@ function App() {
     setActiveView('reader')
   }
 
+  function handleLanguageChange(event) {
+    const idioma = event.target.value
+    setIdiomaDestino(idioma)
+    localStorage.setItem('idiomaDestino', idioma)
+  }
+
   const viewLabels = {
     reader: 'Leitor',
     vocabulary: 'Vocabulário',
@@ -30,7 +39,7 @@ function App() {
   }
 
   const content = activeView === 'reader' ? (
-    <ReaderScreen isDarkMode={isDarkMode} />
+    <ReaderScreen isDarkMode={isDarkMode} idiomaDestino={idiomaDestino} />
   ) : (
     <section className="view-placeholder" aria-labelledby="view-title">
       <p className="eyebrow">Área ativa</p>
@@ -45,6 +54,8 @@ function App() {
       isDarkMode={isDarkMode}
       onNavigate={setActiveView}
       onThemeToggle={handleThemeToggle}
+      idiomaDestino={idiomaDestino}
+      onLanguageChange={handleLanguageChange}
       onLogout={handleLogout}
       content={content}
     />
