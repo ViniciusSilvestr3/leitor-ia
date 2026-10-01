@@ -1,9 +1,9 @@
 const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const modelo = 'gemini-3.5-flash';
+const modelo = (process.env.GEMINI_VERSION || 'gemini-3.8-flash').trim();
 
-async function gerarExplicacao(termo, contexto) {
+async function gerarExplicacao(termo, contexto, idiomaDestino = 'Português') {
     const prompt = `Atue como um especialista literário e professor de idiomas auxiliando um leitor.
     
     TERMO SELECIONADO: "${termo}"
@@ -13,6 +13,7 @@ async function gerarExplicacao(termo, contexto) {
     1. Foque EXCLUSIVAMENTE no significado que a palavra assume nesta frase específica.
     2. Se for um termo fictício, nome próprio ou magia, apenas explique sua função baseada no contexto.
     3. REGRA ABSOLUTA: Sob nenhuma circunstância dê spoilers ou revele fatos futuros da trama.
+    4. Gere a tradução e a análise literária estritamente em ${idiomaDestino}.
 
     Retorne ESTRITAMENTE o seguinte formato JSON:
     {

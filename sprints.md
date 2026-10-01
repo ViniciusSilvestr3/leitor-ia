@@ -93,3 +93,53 @@ Este arquivo registra as principais mudanças realizadas no projeto por fase e p
 - Automatizada a abertura de EPUB e PDF na interface pública ao selecionar o arquivo, removendo a necessidade do botão `Abrir Arquivo`.
 - Corrigida a troca entre formatos para esconder os controles de paginação do PDF ao abrir um EPUB.
 - Resetado o estado do PDF ao trocar para EPUB, evitando que a paginação anterior permaneça ativa.
+
+### Fase 5: Expansão Multi-idioma
+
+- Adicionado o seletor de idioma da explicação com Português, Inglês e Espanhol no frontend React e na interface pública.
+- A preferência de idioma passou a ser persistida localmente e enviada como `idioma_destino` no POST para `/api/explicar`.
+- Atualizado o `aiController.js` para validar os três idiomas permitidos e usar Português como padrão compatível.
+- Atualizado o `geminiService.js` para receber `idioma_destino` e exigir tradução e análise literária estritamente nesse idioma.
+- Mantida a resposta JSON com `responseMimeType: "application/json"` e o esquema atual do banco.
+- Executados lint, build e verificações de sintaxe com sucesso.
+
+## 2026-10-01
+
+### Rollback arquitetural do frontend
+
+- Removida integralmente a aplicação React/Vite em `frontend/`.
+- Restaurada a arquitetura Vanilla JS servida pelo Express em `public/`.
+- Limpo o `package.json` da raiz, mantendo somente `npm start` com `node server.js`.
+- Adicionada `GEMINI_VERSION=gemini-1.5-flash` em `.env` e `.env.example`.
+- Nenhuma alteração realizada em `server.js`, controllers, routes ou services.
+
+## 2026-10-01
+
+### Registro do rollback e diagnóstico da IA
+
+- Confirmado o rollback definitivo do frontend React/Vite para Vanilla JS servido diretamente pelo Express.
+- Removida a pasta `frontend/` e mantido o frontend legado em `public/`.
+- O `package.json` da raiz foi simplificado para iniciar o servidor com `npm start` / `node server.js`.
+- Adicionada a variável `GEMINI_VERSION` aos arquivos de ambiente.
+- Identificado que o erro inicial de autenticação era causado por JWT antigo ou incompatível com o `JWT_SECRET` atual; o token deve ser renovado após novo login.
+- Identificado e corrigido o uso de modelos Gemini inexistentes ou indisponíveis: o service passou a ler `GEMINI_VERSION` e a configuração foi alinhada para `gemini-3.8-flash`.
+- Confirmado que `gemini-3.8-flash` é reconhecido pela API, mas a tentativa de explicação terminou com `503 UNAVAILABLE` por alta demanda do modelo.
+- A API consumiu a tentativa, mas não retornou o objeto JSON de explicação ao usuário.
+- Mantidos o prompt, o retorno JSON, a autenticação e o parâmetro `idioma_destino`.
+
+## 2026-10-01
+
+### Correção da versão do modelo Gemini
+
+- Corrigido o erro `404 NOT_FOUND` causado pelo modelo inexistente fixado no `geminiService.js`.
+- O serviço passou a ler `GEMINI_VERSION` do ambiente, com fallback para `gemini-2.5-flash`.
+- `.env` e `.env.example` foram alinhados para `GEMINI_VERSION=gemini-2.5-flash`.
+- Mantidos o prompt, o retorno JSON e o parâmetro multi-idioma `idioma_destino`.
+
+## 2026-10-01
+
+### Atualização de compatibilidade do Gemini
+
+- A API informou que `gemini-2.5-flash` não está disponível para novos usuários.
+- Atualizados `.env`, `.env.example` e o fallback do `geminiService.js` para `gemini-3.8-flash`, conforme recomendação retornada pela API.
+- Mantidos o prompt, o retorno JSON e a lógica de `idioma_destino`.

@@ -35,6 +35,8 @@
         nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 15px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; transition: background-color 0.3s; }
         .nav-brand { font-weight: 600; font-size: 1.2rem; color: var(--primary); letter-spacing: 0.5px; }
         .nav-links { display: flex; gap: 15px; align-items: center; }
+        .language-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
+        .language-picker select { border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); padding: 5px 7px; }
         nav button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 0.95rem; padding: 5px 10px; transition: color 0.2s; }
         nav button.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
         
@@ -113,6 +115,14 @@
             <div class="nav-links">
                 <button id="navLeitor" class="active">Leitor</button>
                 <button id="navVocab">Vocabulário</button>
+                <label class="language-picker" for="idiomaDestino">
+                    Idioma da explicação
+                    <select id="idiomaDestino">
+                        <option value="Português">Português</option>
+                        <option value="Inglês">Inglês</option>
+                        <option value="Espanhol">Espanhol</option>
+                    </select>
+                </label>
                 <button id="btnThemeToggle" class="btn-outline">Modo Escuro</button>
                 <button id="btnLogout" class="btn-danger">Sair</button>
             </div>
