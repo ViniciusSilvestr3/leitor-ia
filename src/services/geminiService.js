@@ -1,7 +1,7 @@
 const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const modelo = 'gemini-3.5-flash';
+const modelo = (process.env.GEMINI_VERSION || 'gemini-3.8-flash').trim();
 
 async function gerarExplicacao(termo, contexto, idiomaDestino = 'Português') {
     const prompt = `Atue como um especialista literário e professor de idiomas auxiliando um leitor.
