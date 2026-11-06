@@ -55,9 +55,10 @@
         #pdfViewer { min-height: 100%; padding: 20px; box-sizing: border-box; }
         .pdf-page { position: relative; width: fit-content; margin: 0 auto; background: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
         .pdf-page canvas { display: block; }
-        .pdf-text-layer { position: absolute; inset: 0; overflow: hidden; opacity: 0.2; line-height: 1; }
+        .pdf-text-layer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1; }
         .pdf-text-layer span { position: absolute; white-space: pre; transform-origin: 0 0; color: transparent; cursor: text; }
-        .pdf-text-layer ::selection { background: rgba(52, 152, 219, 0.35); }
+        .pdf-text-layer ::selection,
+        .pdf-text-layer span::selection { color: #1f2933; background: rgba(52, 152, 219, 0.45); }
         .pdf-controls { display: none; justify-content: center; align-items: center; gap: 12px; margin-top: 10px; color: var(--text-muted); }
 
         /* Vocabulário */
@@ -157,6 +158,10 @@
             <div style="max-width: 600px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; justify-content: center;">
                 <div id="game-loading" style="text-align: center; display: none;"><h3 color="var(--text-muted)">Gerando perguntas...</h3></div>
                 <div id="game-content" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); margin-bottom: 12px; font-size: 0.9rem;">
+                        <span id="game-progress">Pergunta 1</span>
+                        <strong id="game-score">Pontuação: 0</strong>
+                    </div>
                     <div style="background: var(--surface); border: 1px solid var(--border); padding: 30px; border-radius: 8px; margin-bottom: 20px;">
                         <h2 id="game-pergunta" style="margin: 0; font-size: 1.2rem; text-align: center;"></h2>
                     </div>
