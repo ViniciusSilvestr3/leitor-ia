@@ -4,98 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leitor Inteligente</title>
-    <style>
-        /* Variáveis de Tema (Claro por padrão) */
-        :root {
-            --primary: #2c3e50;
-            --accent: #3498db;
-            --bg: #f8f9fa;
-            --surface: #ffffff;
-            --text: #333333;
-            --text-muted: #7f8c8d;
-            --border: #e2e8f0;
-            --danger: #e74c3c;
-            --success: #27ae60;
-        }
-
-        /* Variáveis de Tema (Noturno) */
-        body.dark-mode {
-            --primary: #ecf0f1;
-            --accent: #2980b9;
-            --bg: #121212;
-            --surface: #1e1e1e;
-            --text: #e0e0e0;
-            --text-muted: #95a5a6;
-            --border: #333333;
-        }
-
-        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); transition: background-color 0.3s, color 0.3s; }
-        
-        /* Navbar Minimalista */
-        nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 15px 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; transition: background-color 0.3s; }
-        .nav-brand { font-weight: 600; font-size: 1.2rem; color: var(--primary); letter-spacing: 0.5px; }
-        .nav-links { display: flex; gap: 15px; align-items: center; }
-        .language-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 0.85rem; white-space: nowrap; }
-        .language-picker select { border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); padding: 5px 7px; }
-        nav button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 0.95rem; padding: 5px 10px; transition: color 0.2s; }
-        nav button.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
-        
-        .btn-outline { border: 1px solid var(--border) !important; border-radius: 4px; }
-        .btn-outline:hover { background: var(--border); }
-        .btn-danger { color: var(--danger) !important; }
-
-        /* Leitor */
-        .container-leitor { flex-grow: 1; display: flex; flex-direction: column; padding: 20px 10px; max-width: 1000px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-        .upload-bar { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
-        .upload-bar input { color: var(--text); }
-        .btn-primary { background: var(--primary); color: var(--surface); border: none; padding: 8px 16px; border-radius: 4px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
-        .btn-primary:hover { opacity: 0.9; }
-        
-        #viewer { flex-grow: 1; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); height: 70vh; transition: background-color 0.3s; overflow: auto; }
-        #pdfViewer { min-height: 100%; padding: 20px; box-sizing: border-box; }
-        .pdf-page { position: relative; width: fit-content; margin: 0 auto; background: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
-        .pdf-page canvas { display: block; }
-        .pdf-text-layer { position: absolute; inset: 0; overflow: hidden; opacity: 1; line-height: 1; }
-        .pdf-text-layer span { position: absolute; white-space: pre; transform-origin: 0 0; color: transparent; cursor: text; }
-        .pdf-text-layer ::selection,
-        .pdf-text-layer span::selection { color: #1f2933; background: rgba(52, 152, 219, 0.45); }
-        .pdf-controls { display: none; justify-content: center; align-items: center; gap: 12px; margin-top: 10px; color: var(--text-muted); }
-
-        /* Vocabulário */
-        .livro-grupo { margin-bottom: 40px; }
-        .livro-titulo-grupo { border-bottom: 1px solid var(--border); padding-bottom: 8px; color: var(--primary); font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; }
-        .vocab-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        @media (min-width: 768px) { .vocab-grid { grid-template-columns: 1fr 1fr; } }
-        
-        .vocab-card { background: var(--surface); padding: 25px; border-radius: 8px; border: 1px solid var(--border); position: relative; display: flex; flex-direction: column; transition: background-color 0.3s; }
-        .vocab-card strong { font-size: 1.1rem; color: var(--accent); margin-bottom: 8px; }
-        .vocab-card i { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px; display: block; font-style: italic; }
-        .vocab-card p { margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--text); flex-grow: 1; }
-        
-        .card-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 15px; }
-        .btn-text { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; font-weight: 500; padding: 0; }
-        .btn-text.danger { color: var(--text-muted); }
-        .btn-text.danger:hover { color: var(--danger); }
-
-        /* Modal Minimalista */
-        #modalOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; backdrop-filter: blur(2px); }
-        #modalContent { width: 90%; max-width: 450px; background: var(--surface); padding: 30px; border-radius: 8px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 1px solid var(--border); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--primary); }
-        .close-btn { cursor: pointer; color: var(--text-muted); font-size: 1.5rem; line-height: 1; }
-        #termo-box { font-size: 1.1rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
-        #traducao-box { font-size: 1.05rem; font-weight: 600; color: var(--primary); margin-bottom: 12px; }
-        #explicacao-box { font-size: 0.95rem; line-height: 1.6; color: var(--text); margin-bottom: 25px; }
-
-        /* Autenticação (Mantida simples) */
-        .auth-container { background: var(--surface); padding: 40px; border-radius: 8px; border: 1px solid var(--border); width: 100%; max-width: 380px; }
-        .auth-input { width: 100%; padding: 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text); box-sizing: border-box; margin-bottom: 15px; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="auth-screen" style="display: flex; height: 100vh; justify-content: center; align-items: center; padding: 20px;">
         <div class="auth-container">
-            <h2 style="margin-top: 0; text-align: center; color: var(--primary);">Leitor Inteligente</h2>
+            <h2 class="auth-brand">
+                <svg class="brand-mark" viewBox="0 0 40 32" aria-hidden="true">
+                    <path d="M3 6c7-3 12-2 17 2v20c-5-4-10-5-17-2V6Z"></path>
+                    <path d="M37 6c-7-3-12-2-17 2v20c5-4 10-5 17-2V6Z"></path>
+                    <path class="brand-star" d="m20 3 1.5 3.5L25 8l-3.5 1.5L20 13l-1.5-3.5L15 8l3.5-1.5L20 3Z"></path>
+                </svg>
+                <span>Leitor Inteligente</span>
+            </h2>
             <div style="display: flex; margin-bottom: 25px; border-bottom: 1px solid var(--border);">
                 <button id="tabLogin" style="flex: 1; padding: 10px; cursor: pointer; font-weight: 500; border: none; background: none; border-bottom: 2px solid var(--accent); color: var(--accent);">Entrar</button>
                 <button id="tabCadastro" style="flex: 1; padding: 10px; cursor: pointer; font-weight: 500; border: none; background: none; color: var(--text-muted);">Cadastrar</button>
@@ -111,11 +35,18 @@
     </div>
 
     <div id="app-screen" style="display: none; flex-direction: column; height: 100vh;">
-        <nav>
-            <div class="nav-brand">Leitor Inteligente</div>
+        <nav aria-label="Navegação principal">
+            <div class="nav-brand" aria-label="Leitor Inteligente">
+                <svg class="brand-mark" viewBox="0 0 40 32" aria-hidden="true">
+                    <path d="M3 6c7-3 12-2 17 2v20c-5-4-10-5-17-2V6Z"></path>
+                    <path d="M37 6c-7-3-12-2-17 2v20c5-4 10-5 17-2V6Z"></path>
+                    <path class="brand-star" d="m20 3 1.5 3.5L25 8l-3.5 1.5L20 13l-1.5-3.5L15 8l3.5-1.5L20 3Z"></path>
+                </svg>
+                <span>Leitor <strong>Inteligente</strong></span>
+            </div>
             <div class="nav-links">
-                <button id="navLeitor" class="active">Leitor</button>
-                <button id="navVocab">Vocabulário</button>
+                <button id="navLeitor" class="nav-section-button active" type="button">Leitor</button>
+                <button id="navVocab" class="nav-section-button" type="button">Vocabulário</button>
                 <label class="language-picker" for="idiomaDestino">
                     Idioma da explicação
                     <select id="idiomaDestino">
@@ -124,23 +55,41 @@
                         <option value="Espanhol">Espanhol</option>
                     </select>
                 </label>
-                <button id="btnThemeToggle" class="btn-outline">Modo Escuro</button>
-                <button id="btnLogout" class="btn-danger">Sair</button>
+                <button id="btnThemeToggle" class="btn-outline" type="button">Modo Escuro</button>
+                <button id="btnLogout" class="btn-danger" type="button">Sair</button>
             </div>
         </nav>
         
         <div id="screen-reader" class="sub-screen container-leitor">
             <div class="upload-bar">
+                <label class="upload-label" for="bookInput">Adicionar livro</label>
                 <input type="file" id="bookInput" accept=".epub,.pdf,application/epub+zip,application/pdf">
+                <span class="upload-help">PDF ou EPUB</span>
             </div>
-            <div id="viewer"></div>
+            <div id="reader-panel">
+                <div id="viewer"></div>
+                <button id="reader-prev" class="reader-nav reader-nav-prev" type="button" aria-label="Página anterior" disabled>
+                    <span aria-hidden="true">←</span>
+                </button>
+                <button id="reader-next" class="reader-nav reader-nav-next" type="button" aria-label="Próxima página" disabled>
+                    <span aria-hidden="true">→</span>
+                </button>
+                <div id="selection-actions" class="selection-actions" role="toolbar" aria-label="Ações da seleção" hidden>
+                    <button id="selection-explain" class="btn-primary" type="button">Explicar</button>
+                    <button id="selection-highlight" class="btn-outline" type="button">Grifar</button>
+                    <button id="selection-dismiss" class="selection-dismiss" type="button" aria-label="Fechar ações da seleção">Esc</button>
+                </div>
+                <div id="reading-progress" class="reading-progress" aria-live="polite">
+                    <span id="reading-progress-text">Abra um PDF ou EPUB para começar.</span>
+                </div>
+            </div>
             <div id="pdf-controls" class="pdf-controls">
                 <button id="pdf-prev" class="btn-outline" type="button">Página anterior</button>
                 <span id="pdf-page-number">Página 1</span>
                 <button id="pdf-next" class="btn-outline" type="button">Próxima página</button>
             </div>
             <div id="controls" style="display: none; text-align: center; margin-top: 10px; color: var(--text-muted); font-size: 0.85rem;">
-                Clique nas laterais da tela para mudar de página.
+                Use as setas laterais ou as setas do teclado para mudar de página.
             </div>
         </div>
 
@@ -148,7 +97,7 @@
             <div style="max-width: 900px; margin: 0 auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                     <h2 style="margin: 0; color: var(--primary);">Seu Vocabulário</h2>
-                    <button id="btnIniciarJogo" class="btn-primary" style="background: var(--accent);">Iniciar Revisão</button>
+                    <button id="btnIniciarJogo" class="btn-primary" type="button">Iniciar Revisão</button>
                 </div>
                 <div id="lista-flashcards"></div>
             </div>
@@ -182,15 +131,18 @@
         </div>
 
         <div id="modalOverlay">
-            <div id="modalContent">
+            <div id="modalContent" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
                 <div class="modal-header">
-                    <h3>Análise Contextual</h3>
-                    <span id="closeModal" class="close-btn">&times;</span>
+                    <h3 id="modalTitle">Análise contextual</h3>
+                    <button id="closeModal" class="close-btn" type="button" aria-label="Fechar explicação">&times;</button>
                 </div>
                 <div id="termo-box"></div>
+                <div id="idioma-box"></div>
                 <div id="traducao-box"></div>
                 <div id="explicacao-box"></div>
-                <button id="btnSalvarCard" class="btn-primary" style="width: 100%; display: none;">Salvar Palavra</button>
+                <p class="privacy-note">O trecho selecionado e o contexto necessário são enviados ao serviço de IA para gerar esta explicação.</p>
+                <p id="modal-status" class="sr-only" aria-live="polite"></p>
+                <button id="btnSalvarCard" class="btn-primary" type="button" style="display: none;">Salvar Palavra</button>
             </div>
         </div>
     </div>
@@ -203,6 +155,7 @@
 <script>
     if (localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark-mode');
+        document.body.dataset.theme = 'dark';
     }
 </script>
 </html>

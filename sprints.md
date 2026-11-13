@@ -181,3 +181,49 @@ Este arquivo registra as principais mudanças realizadas no projeto por fase e p
 - Ao selecionar uma frase no EPUB, a página permanece no mesmo local enquanto a análise é aberta.
 - A navegação lateral do EPUB continua funcionando para cliques sem seleção.
 - Nenhuma chave de API ou arquivo físico do livro é exposto ao frontend ou enviado ao backend.
+
+## 2026-11-13
+
+### Integração do Design System
+
+- Aplicados tokens semânticos de cor, tipografia, espaçamento, foco e tema claro/escuro ao frontend Vanilla JS.
+- Refinada a hierarquia visual do leitor, da importação de arquivos, do vocabulário e do minigame sem alterar os contratos do backend.
+- Melhorada a semântica e a acessibilidade da análise contextual, incluindo diálogo rotulado, fechamento por `Esc`, anúncio de estados e idioma explícito.
+- Mantida a seleção estável no EPUB, a navegação existente e o fluxo de revisão com flashcards.
+
+### Ajustes de navegação e progresso
+
+- Adicionada navegação do leitor pelas setas `ArrowLeft` e `ArrowRight`, incluindo o documento EPUB renderizado em iframe.
+- Criado indicador persistente no canto inferior do painel com página atual, total e percentual quando disponível.
+- Adicionado cálculo de progresso para PDF e geração de localizações do EPUB para estimar o percentual lido.
+- Corrigida a navegação lateral do leitor com controles fixos de página anterior/próxima, removendo a dependência da coordenada do clique dentro do iframe.
+- Ajustado o indicador EPUB para usar localizações do livro inteiro e identificar páginas estimadas, em vez do total do capítulo atual.
+
+### Seleção opcional e grifo
+
+- Removida a consulta automática ao selecionar texto no EPUB ou PDF.
+- Adicionadas ações explícitas para explicar, grifar ou dispensar a seleção.
+- Mantida a seleção sem requisição à IA quando o usuário apenas seleciona uma palavra ou frase.
+
+## 2026-11-13
+
+### Integração do Manual de Identidade Visual 1.1
+
+- Centralizada a camada institucional com marfim, azul profundo, sálvia, dourado e carvão, incluindo uma variação própria para o tema escuro.
+- Aplicadas as fontes Inter à interface e Source Serif 4 ao texto editorial e à marca.
+- Adicionada assinatura vetorial discreta de livro aberto e estrela no acesso e no cabeçalho do leitor.
+- Refinados botões, foco, superfícies, seleção, modal contextual e vocabulário para preservar a leitura como protagonista.
+- Incluído aviso explícito de que o trecho e o contexto necessário são enviados ao serviço de IA durante a explicação.
+- Mantida a distinção visual entre a página PDF original e a superfície refluível do EPUB.
+
+### Correção de regressão visual
+
+- Restauradas as regras estruturais de layout que haviam ficado no CSS inline: reset da página, navegação, upload, leitor PDF, controles, autenticação e grid do vocabulário.
+- Mantida a identidade visual do manual com os tokens institucionais no stylesheet centralizado.
+
+### Pop-up contextual e controles de leitura
+
+- Mantida a explicação como pop-up sobreposto e centralizado na viewport, inclusive em telas pequenas, sem abrir uma folha abaixo do leitor.
+- Refinados os botões laterais de navegação com dimensões, ícones, estados e contraste alinhados à identidade.
+- Refinada a barra de ações da seleção com hierarquia visual entre “Explicar”, “Grifar” e “Esc”.
+- Transformadas as entradas “Leitor” e “Vocabulário” em abas editoriais suaves, com tipografia de leitura e indicador discreto em dourado.
