@@ -13,6 +13,7 @@ let cfiAtual = "";
 let pdfAtual = null;
 let pdfPaginaAtual = 1;
 let pdfRenderizando = false;
+let ignorarCliqueAte = 0;
 // ==========================================
 // MODO NOTURNO
 // ==========================================
@@ -253,12 +254,14 @@ function renderizarLivro(conteudoLivro) {
     // Registra os temas DENTRO do iframe do livro
     currentRendition.themes.register("light", {
         "body": { "background": "#ffffff", "color": "#333333" },
+        "body::selection": { "background": "#b9dcff", "color": "#1f2933" },
         "img": { "max-width": "100% !important", "max-height": "80vh !important", "height": "auto !important", "object-fit": "contain !important", "display": "block !important", "margin": "0 auto !important" },
         "svg": { "max-width": "100% !important", "max-height": "80vh !important" }
     });
     
     currentRendition.themes.register("dark", {
         "body": { "background": "#1e1e1e", "color": "#e0e0e0" },
+        "body::selection": { "background": "#28527a", "color": "#ffffff" },
         "img": { "max-width": "100% !important", "max-height": "80vh !important", "height": "auto !important", "object-fit": "contain !important", "display": "block !important", "margin": "0 auto !important" },
         "svg": { "max-width": "100% !important", "max-height": "80vh !important" },
         "a": { "color": "#66b3ff" }
@@ -290,6 +293,8 @@ function renderizarLivro(conteudoLivro) {
 
     // MUDANÇA DE PÁGINA PELO CLIQUE (Ignora se for um grifo)
     currentRendition.on("click", (e) => {
+        if (Date.now() < ignorarCliqueAte) return;
+
         const contents = currentRendition.manager.getContents()[0];
         const selecao = contents.window.getSelection().toString().trim();
         
@@ -309,6 +314,7 @@ function renderizarLivro(conteudoLivro) {
     // Lógica Inteligente de Captura para a IA (Mantida igual)
     let timeoutSelecao;
     currentRendition.on("selected", function (cfiRange, contents) {
+        ignorarCliqueAte = Date.now() + 1200;
         clearTimeout(timeoutSelecao); 
         timeoutSelecao = setTimeout(async () => {
             const range = await book.getRange(cfiRange);
@@ -606,29 +612,43 @@ window.deletarFlashcard = async function(id) {
 // ==========================================
 // 9. O MOTOR DO MINIGAME (Estilo Kahoot)
 // ==========================================
-let perguntasJogo = []; let perguntaAtualIndex = 0;
+let perguntasJogo = [];
+let perguntaAtualIndex = 0;
+let pontuacaoJogo = 0;
+let resultadoFinalExibido = false;
 const btnIniciarJogo = document.getElementById('btnIniciarJogo');
 const btnSairJogo = document.getElementById('btnSairJogo');
 const gameLoading = document.getElementById('game-loading');
 const gameContent = document.getElementById('game-content');
 const gameFeedback = document.getElementById('game-feedback');
 const botoesOpcao = document.querySelectorAll('.game-opt');
+const gameProgress = document.getElementById('game-progress');
+const gameScore = document.getElementById('game-score');
+const btnProximaPergunta = document.getElementById('btnProximaPergunta');
 
 btnIniciarJogo.addEventListener('click', async () => {
     const token = localStorage.getItem('token');
     screenVocab.style.display = 'none'; screenGame.style.display = 'flex';
     gameLoading.style.display = 'block'; gameContent.style.display = 'none'; gameFeedback.style.display = 'none';
+    pontuacaoJogo = 0;
+    perguntaAtualIndex = 0;
+    resultadoFinalExibido = false;
+    gameScore.innerText = 'Pontuação: 0';
+    btnProximaPergunta.innerText = 'Próxima pergunta';
 
     try {
         const response = await fetch('/api/minigame/gerar', { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await response.json();
         if (response.ok) {
-            perguntasJogo = data.quiz; perguntaAtualIndex = 0;
+            perguntasJogo = Array.isArray(data.quiz) ? data.quiz : [];
+            if (perguntasJogo.length === 0) {
+                throw new Error('O servidor não retornou perguntas.');
+            }
             gameLoading.style.display = 'none'; mostrarPergunta(); 
         } else {
             alert(data.erro); navVocab.click(); 
         }
-    } catch (error) { alert("Erro ao gerar o jogo."); navVocab.click(); }
+    } catch (error) { alert(error.message || "Erro ao gerar o jogo."); navVocab.click(); }
 });
 
 btnSairJogo.addEventListener('click', () => { navVocab.click(); });
@@ -636,27 +656,57 @@ btnSairJogo.addEventListener('click', () => { navVocab.click(); });
 function mostrarPergunta() {
     gameFeedback.style.display = 'none'; gameContent.style.display = 'block';
     const perguntaAtual = perguntasJogo[perguntaAtualIndex];
+    gameProgress.innerText = `Pergunta ${perguntaAtualIndex + 1} de ${perguntasJogo.length}`;
+    gameScore.innerText = `Pontuação: ${pontuacaoJogo}`;
     document.getElementById('game-pergunta').innerText = perguntaAtual.pergunta;
     botoesOpcao.forEach((botao, index) => {
         botao.innerText = perguntaAtual.opcoes[index];
+        botao.disabled = false;
+        botao.style.opacity = '1';
         botao.onclick = () => verificarResposta(index);
     });
 }
 
 function verificarResposta(indiceEscolhido) {
+    botoesOpcao.forEach(botao => {
+        botao.disabled = true;
+        botao.style.opacity = '0.7';
+    });
+
     gameContent.style.display = 'none'; gameFeedback.style.display = 'block';
     const perguntaAtual = perguntasJogo[perguntaAtualIndex];
     const acertou = (indiceEscolhido === perguntaAtual.resposta_correta);
     const titulo = document.getElementById('feedback-titulo');
     const texto = document.getElementById('feedback-texto');
 
-    if (acertou) { titulo.innerText = "🎉 Correto!"; titulo.style.color = "#28a745"; } 
+    if (acertou) {
+        pontuacaoJogo++;
+        titulo.innerText = "Correto!";
+        titulo.style.color = "#28a745";
+    }
     else { titulo.innerText = "❌ Incorreto!"; titulo.style.color = "#dc3545"; }
     texto.innerText = perguntaAtual.explicacao;
+    gameScore.innerText = `Pontuação: ${pontuacaoJogo}`;
+    btnProximaPergunta.innerText = perguntaAtualIndex + 1 < perguntasJogo.length
+        ? 'Próxima pergunta'
+        : 'Ver resultado';
 }
 
-document.getElementById('btnProximaPergunta').addEventListener('click', () => {
-    perguntaAtualIndex++;
-    if (perguntaAtualIndex < perguntasJogo.length) mostrarPergunta();
-    else { alert("🏆 Fim do jogo!"); navVocab.click(); }
+btnProximaPergunta.addEventListener('click', () => {
+    if (perguntaAtualIndex + 1 < perguntasJogo.length) {
+        perguntaAtualIndex++;
+        mostrarPergunta();
+        return;
+    }
+
+    if (resultadoFinalExibido) {
+        navVocab.click();
+        return;
+    }
+
+    resultadoFinalExibido = true;
+    document.getElementById('feedback-titulo').innerText = 'Resultado final';
+    document.getElementById('feedback-titulo').style.color = '#3498db';
+    document.getElementById('feedback-texto').innerText = `Você acertou ${pontuacaoJogo} de ${perguntasJogo.length} perguntas.`;
+    btnProximaPergunta.innerText = 'Voltar ao vocabulário';
 });

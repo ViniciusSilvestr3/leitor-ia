@@ -143,3 +143,41 @@ Este arquivo registra as principais mudanças realizadas no projeto por fase e p
 - A API informou que `gemini-2.5-flash` não está disponível para novos usuários.
 - Atualizados `.env`, `.env.example` e o fallback do `geminiService.js` para `gemini-3.8-flash`, conforme recomendação retornada pela API.
 - Mantidos o prompt, o retorno JSON e a lógica de `idioma_destino`.
+
+## 2026-11-06
+
+### Sprint 7: Minigame de revisão e seleção estável de texto
+
+#### Objetivo
+
+- Disponibilizar um minigame funcional, inspirado em Kahoot, usando os flashcards do usuário.
+- Impedir que a seleção de uma palavra ou frase no EPUB provoque uma troca imediata de página.
+
+#### Escopo do minigame
+
+- Corrigir a geração do quiz no `geminiService.js`, utilizando os flashcards recebidos como fonte das perguntas.
+- Padronizar o retorno da IA como uma lista JSON de perguntas com enunciado, quatro alternativas, índice da resposta correta e explicação.
+- Exibir perguntas e alternativas na tela existente de minigame.
+- Exibir progresso, pontuação, feedback de acerto/erro e resultado final.
+- Manter o requisito mínimo de dois flashcards para iniciar uma partida.
+- Restringir cada partida aos flashcards do usuário autenticado.
+- Repetir temporariamente a chamada ao Gemini em caso de indisponibilidade `503`.
+- Usar um quiz local baseado nos flashcards quando o Gemini permanecer indisponível.
+
+#### Escopo da seleção no EPUB
+
+- Bloquear a navegação lateral quando o evento de clique fizer parte de uma seleção de texto.
+- Manter a captura do termo, contexto e CFI para a análise e o flashcard.
+- Preservar a navegação por clique nas laterais quando não houver seleção em andamento.
+
+#### Critérios de aceite
+
+- Com pelo menos dois flashcards, o botão `Iniciar Revisão` gera e exibe perguntas sem erro de JavaScript.
+- Cada pergunta apresenta quatro alternativas e permite apenas uma resposta.
+- A resposta mostra feedback, atualiza a pontuação e permite avançar.
+- Ao terminar, o usuário vê a pontuação final e pode retornar ao vocabulário.
+- Com menos de dois flashcards, o sistema informa o requisito sem abrir uma partida vazia.
+- Uma indisponibilidade temporária do Gemini não impede a partida, pois o sistema possui fallback local.
+- Ao selecionar uma frase no EPUB, a página permanece no mesmo local enquanto a análise é aberta.
+- A navegação lateral do EPUB continua funcionando para cliques sem seleção.
+- Nenhuma chave de API ou arquivo físico do livro é exposto ao frontend ou enviado ao backend.

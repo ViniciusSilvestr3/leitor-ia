@@ -38,7 +38,7 @@ async function excluirFlashcard(id, usuarioId) {
 async function buscarFlashcardsParaMinigame(usuarioId) {
     try {
         return await database.all(
-            'SELECT termo_original, frase_contexto FROM flashcards WHERE usuario_id = ? ORDER BY RANDOM() LIMIT 5',
+            'SELECT termo_original, traducao, frase_contexto, explicacao_ia FROM flashcards WHERE usuario_id = ? ORDER BY RANDOM() LIMIT 5',
             [usuarioId]
         );
     } catch (error) {
