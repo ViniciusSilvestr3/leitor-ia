@@ -14,6 +14,169 @@ let pdfAtual = null;
 let pdfPaginaAtual = 1;
 let pdfRenderizando = false;
 let ignorarCliqueAte = 0;
+let epubLocationsReady = false;
+let ultimaLocalizacaoEpub = null;
+let selecaoPendente = null;
+const modalOverlay = document.getElementById('modalOverlay');
+const readerPrev = document.getElementById('reader-prev');
+const readerNext = document.getElementById('reader-next');
+const selectionActions = document.getElementById('selection-actions');
+const selectionExplain = document.getElementById('selection-explain');
+const selectionHighlight = document.getElementById('selection-highlight');
+const selectionDismiss = document.getElementById('selection-dismiss');
+
+function esconderAcoesSelecao() {
+    selectionActions.hidden = true;
+    selecaoPendente = null;
+}
+
+function posicionarAcoesSelecao(rect) {
+    const painel = document.getElementById('reader-panel').getBoundingClientRect();
+    const largura = selectionActions.offsetWidth || 220;
+    const margem = 12;
+    const esquerda = Math.min(
+        Math.max(rect.left - painel.left + (rect.width / 2) - (largura / 2), margem),
+        painel.width - largura - margem
+    );
+    const acima = rect.bottom - painel.top + 8;
+    selectionActions.style.left = `${esquerda}px`;
+    selectionActions.style.top = `${Math.min(acima, painel.height - 56)}px`;
+    selectionActions.hidden = false;
+}
+
+function prepararSelecao({ texto, contexto, cfi = '', contents = null, range = null, highlight = null }) {
+    if (!texto.trim()) return;
+
+    selecaoPendente = { texto: texto.trim(), contexto, cfi, contents, range, highlight };
+    const rect = range?.getBoundingClientRect?.() || highlight?.getBoundingClientRect?.();
+    if (rect) {
+        const iframe = contents?.document?.defaultView?.frameElement;
+        if (iframe) {
+            const iframeRect = iframe.getBoundingClientRect();
+            posicionarAcoesSelecao({
+                top: iframeRect.top + rect.top,
+                bottom: iframeRect.top + rect.bottom,
+                left: iframeRect.left + rect.left,
+                width: rect.width,
+            });
+        } else {
+            posicionarAcoesSelecao(rect);
+        }
+    } else {
+        selectionActions.hidden = false;
+    }
+}
+
+selectionExplain.addEventListener('click', async () => {
+    if (!selecaoPendente) return;
+    const selecao = selecaoPendente;
+    esconderAcoesSelecao();
+    if (selecao.contents) selecao.contents.window.getSelection().removeAllRanges();
+    await solicitarExplicacao(selecao.texto, selecao.contexto, selecao.cfi);
+});
+
+selectionHighlight.addEventListener('click', () => {
+    if (!selecaoPendente) return;
+    const selecao = selecaoPendente;
+    if (selecao.highlight) {
+        selecao.highlight();
+    } else if (selecao.cfi && currentRendition) {
+        currentRendition.annotations.highlight(selecao.cfi, {}, () => {});
+    }
+    if (selecao.contents) selecao.contents.window.getSelection().removeAllRanges();
+    esconderAcoesSelecao();
+});
+
+selectionDismiss.addEventListener('click', esconderAcoesSelecao);
+
+function definirNavegacaoAtiva(ativa) {
+    readerPrev.disabled = !ativa;
+    readerNext.disabled = !ativa;
+}
+
+function atualizarIndicadorLeitura({ pagina, total, percentual, estimada = false }) {
+    const indicador = document.getElementById('reading-progress');
+    const texto = document.getElementById('reading-progress-text');
+    if (!indicador || !texto) return;
+
+    indicador.style.display = 'flex';
+    const percentualValido = Number.isFinite(percentual)
+        ? ` · ${Math.round(Math.min(Math.max(percentual, 0), 1) * 100)}%`
+        : '';
+
+    if (Number.isFinite(pagina) && Number.isFinite(total) && total > 0) {
+        texto.innerText = `${estimada ? 'Página estimada' : 'Página'} ${pagina} de ${total}${percentualValido}`;
+        return;
+    }
+
+    texto.innerText = Number.isFinite(percentual)
+        ? `${Math.round(Math.min(Math.max(percentual, 0), 1) * 100)}% lido`
+        : 'Progresso da leitura indisponível';
+}
+
+function atualizarProgressoEpub(location, book) {
+    const exibicao = location?.start?.displayed;
+    let percentual = Number(location?.start?.percentage);
+    let pagina;
+    let total;
+
+    if (epubLocationsReady && location?.start?.cfi) {
+        percentual = book.locations.percentageFromCfi(location.start.cfi);
+        pagina = book.locations.locationFromCfi(location.start.cfi) + 1;
+        total = book.locations.length();
+    }
+
+    atualizarIndicadorLeitura({
+        pagina: Number.isFinite(pagina) ? pagina : Number(exibicao?.page),
+        total: Number.isFinite(total) ? total : undefined,
+        percentual,
+        estimada: true,
+    });
+}
+
+function navegarLeitor(direcao) {
+    if (modalOverlay?.style.display === 'block') return;
+    esconderAcoesSelecao();
+
+    if (pdfAtual) {
+        const proximaPagina = pdfPaginaAtual + direcao;
+        if (proximaPagina >= 1 && proximaPagina <= pdfAtual.numPages) {
+            pdfPaginaAtual = proximaPagina;
+            renderizarPaginaPdf(pdfPaginaAtual);
+        }
+        return;
+    }
+
+    if (currentRendition) {
+        if (direcao < 0) currentRendition.prev();
+        else currentRendition.next();
+    }
+}
+
+function teclaPodeNavegar(event) {
+    const elemento = event.target;
+    return !(elemento instanceof HTMLInputElement ||
+        elemento instanceof HTMLTextAreaElement ||
+        elemento instanceof HTMLSelectElement ||
+        elemento instanceof HTMLButtonElement ||
+        elemento?.isContentEditable);
+}
+
+function lidarComTeclaDeNavegacao(event) {
+    if (!teclaPodeNavegar(event)) return;
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        navegarLeitor(-1);
+    } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        navegarLeitor(1);
+    }
+}
+
+document.addEventListener('keydown', lidarComTeclaDeNavegacao);
+readerPrev.addEventListener('click', () => navegarLeitor(-1));
+readerNext.addEventListener('click', () => navegarLeitor(1));
+definirNavegacaoAtiva(false);
 // ==========================================
 // MODO NOTURNO
 // ==========================================
@@ -29,9 +192,11 @@ idiomaDestinoSelect.addEventListener('change', () => {
 function aplicarTema() {
     if (isDarkMode) {
         document.body.classList.add('dark-mode');
+        document.body.dataset.theme = 'dark';
         btnThemeToggle.innerText = 'Modo Claro';
     } else {
         document.body.classList.remove('dark-mode');
+        document.body.dataset.theme = 'light';
         btnThemeToggle.innerText = 'Modo Escuro';
     }
 
@@ -186,8 +351,10 @@ async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
 
     document.getElementById('modalOverlay').style.display = 'block';
     document.getElementById('termo-box').innerText = textoSelecionado;
+    document.getElementById('idioma-box').innerText = `Idioma da explicação: ${idiomaDestino}`;
     document.getElementById('traducao-box').innerText = '';
-    document.getElementById('explicacao-box').innerText = "Analisando contexto...";
+    document.getElementById('explicacao-box').innerText = "Analisando o contexto...";
+    document.getElementById('modal-status').innerText = "Analisando o contexto...";
     document.getElementById('btnSalvarCard').style.display = 'none';
 
     try {
@@ -203,6 +370,7 @@ async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
             document.getElementById('termo-box').innerText = vocabulario.termo_base;
             document.getElementById('traducao-box').innerText = vocabulario.traducao;
             document.getElementById('explicacao-box').innerText = vocabulario.explicacao;
+            document.getElementById('modal-status').innerText = "Explicação disponível.";
             termoAtual = vocabulario.termo_base;
             contextoAtual = contexto;
             explicacaoAtual = vocabulario.explicacao;
@@ -212,10 +380,12 @@ async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
             btnSalvar.style.display = 'none';
         } else {
             document.getElementById('traducao-box').innerText = '';
-            document.getElementById('explicacao-box').innerText = "Erro: " + data.erro;
+            document.getElementById('explicacao-box').innerText = "Não foi possível obter a explicação. Tente novamente.";
+            document.getElementById('modal-status').innerText = data.erro || "Falha na análise.";
         }
     } catch (error) {
-        document.getElementById('explicacao-box').innerText = "Erro de conexão com a API.";
+        document.getElementById('explicacao-box').innerText = "Não foi possível obter a explicação. Tente novamente.";
+        document.getElementById('modal-status').innerText = "Erro de conexão com a API.";
     }
 }
 
@@ -230,9 +400,13 @@ async function solicitarExplicacao(textoSelecionado, contexto, cfi = "") {
 // ==========================================
 function renderizarLivro(conteudoLivro) {
     if (currentRendition) currentRendition.destroy();
+    esconderAcoesSelecao();
     pdfAtual = null;
     pdfPaginaAtual = 1;
     pdfRenderizando = false;
+    epubLocationsReady = false;
+    ultimaLocalizacaoEpub = null;
+    definirNavegacaoAtiva(false);
     document.getElementById('pdf-controls').style.display = 'none';
     document.getElementById('viewer').innerHTML = ''; 
     
@@ -240,6 +414,14 @@ function renderizarLivro(conteudoLivro) {
     
     book.ready.then(() => {
         tituloLivroAtual = book.package.metadata.title || "Livro Desconhecido";
+        return book.locations.generate(1600);
+    }).then(() => {
+        epubLocationsReady = true;
+        definirNavegacaoAtiva(true);
+        if (ultimaLocalizacaoEpub) atualizarProgressoEpub(ultimaLocalizacaoEpub, book);
+    }).catch(() => {
+        epubLocationsReady = false;
+        definirNavegacaoAtiva(true);
     });
     
     currentRendition = book.renderTo("viewer", {
@@ -282,63 +464,54 @@ function renderizarLivro(conteudoLivro) {
 
     currentRendition.display().then(() => {
         document.getElementById('controls').style.display = 'block';
+        definirNavegacaoAtiva(true);
     }).catch(erro => console.error("Erro ao renderizar:", erro));
 
     // SALVAR PROGRESSO: Dispara toda vez que a página é virada
     currentRendition.on("relocated", function(location) {
+        ultimaLocalizacaoEpub = location;
         if (tituloLivroAtual !== "Livro Desconhecido") {
             localStorage.setItem('progresso_' + tituloLivroAtual, location.start.cfi);
         }
+        atualizarProgressoEpub(location, book);
     });
 
-    // MUDANÇA DE PÁGINA PELO CLIQUE (Ignora se for um grifo)
-    currentRendition.on("click", (e) => {
-        if (Date.now() < ignorarCliqueAte) return;
-
-        const contents = currentRendition.manager.getContents()[0];
-        const selecao = contents.window.getSelection().toString().trim();
-        
-        // Se o usuário selecionou algum texto, não muda de página
-        if (selecao.length > 0) return;
-
-        const screenWidth = contents.window.innerWidth;
-        const clickX = e.clientX;
-
-        if (clickX < screenWidth / 2) {
-            currentRendition.prev();
-        } else {
-            currentRendition.next();
-        }
+    currentRendition.on('rendered', (_section, contents) => {
+        contents.document.addEventListener('keydown', lidarComTeclaDeNavegacao);
     });
 
-    // Lógica Inteligente de Captura para a IA (Mantida igual)
-    let timeoutSelecao;
+    // A seleção aguarda uma ação explícita: explicar ou grifar.
     currentRendition.on("selected", function (cfiRange, contents) {
         ignorarCliqueAte = Date.now() + 1200;
-        clearTimeout(timeoutSelecao); 
-        timeoutSelecao = setTimeout(async () => {
-            const range = await book.getRange(cfiRange);
+        book.getRange(cfiRange).then(range => {
             const textoSelecionado = range.toString().trim();
+            if (!textoSelecionado) return;
 
-            if (textoSelecionado) {
-                const selection = contents.window.getSelection();
-                const node = selection.anchorNode;
-                const paragrafoContexto = node ? node.parentElement.textContent.trim() : "";
-                
-                contents.window.getSelection().removeAllRanges();
-                currentRendition.annotations.highlight(cfiRange, {}, (e) => {});
-                
-                await solicitarExplicacao(textoSelecionado, paragrafoContexto, cfiRange);
-            }
-        }, 400);
+            const selection = contents.window.getSelection();
+            const node = selection.anchorNode;
+            const paragrafoContexto = node?.parentElement?.textContent?.trim() || "";
+
+            prepararSelecao({
+                texto: textoSelecionado,
+                contexto: paragrafoContexto,
+                cfi: cfiRange,
+                contents,
+                range,
+            });
+        }).catch(error => {
+            console.error("Não foi possível preparar a seleção do EPUB:", error);
+        });
     });
 }
 
 async function renderizarPdf(conteudoPdf) {
     if (currentRendition) currentRendition.destroy();
+    esconderAcoesSelecao();
     document.getElementById('controls').style.display = 'none';
     document.getElementById('viewer').innerHTML = '<div id="pdfViewer"></div>';
     document.getElementById('pdf-controls').style.display = 'flex';
+    epubLocationsReady = false;
+    definirNavegacaoAtiva(false);
     pdfPaginaAtual = 1;
     tituloLivroAtual = "Documento PDF";
 
@@ -346,6 +519,7 @@ async function renderizarPdf(conteudoPdf) {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         pdfAtual = await pdfjsLib.getDocument({ data: conteudoPdf }).promise;
         await renderizarPaginaPdf(pdfPaginaAtual);
+        definirNavegacaoAtiva(true);
     } catch (error) {
         console.error("Erro ao abrir o PDF:", error);
         document.getElementById('viewer').innerText = "Não foi possível abrir o arquivo PDF.";
@@ -392,13 +566,30 @@ async function renderizarPaginaPdf(numeroPagina) {
         if (renderTextLayerTask.promise) await renderTextLayerTask.promise;
 
         textLayer.addEventListener('mouseup', () => {
-            const selecao = textLayer.ownerDocument.getSelection().toString().trim();
+            const selecaoDocumento = textLayer.ownerDocument.getSelection();
+            const selecao = selecaoDocumento.toString().trim();
             if (!selecao) return;
             const contexto = textContent.items.map(item => item.str).join(' ').trim();
-            solicitarExplicacao(selecao, contexto);
+            const range = selecaoDocumento.rangeCount ? selecaoDocumento.getRangeAt(0).cloneRange() : null;
+            prepararSelecao({
+                texto: selecao,
+                contexto,
+                range,
+                highlight: () => {
+                    if (!range) return;
+                    textLayer.querySelectorAll('span').forEach(span => {
+                        if (range.intersectsNode(span)) span.classList.add('pdf-highlight');
+                    });
+                },
+            });
         });
 
         document.getElementById('pdf-page-number').innerText = `Página ${numeroPagina} de ${pdfAtual.numPages}`;
+        atualizarIndicadorLeitura({
+            pagina: numeroPagina,
+            total: pdfAtual.numPages,
+            percentual: numeroPagina / pdfAtual.numPages,
+        });
     } catch (error) {
         console.error("Erro ao renderizar página do PDF:", error);
     } finally {
@@ -461,9 +652,11 @@ document.getElementById('btnSalvarCard').addEventListener('click', async () => {
     }
 });
 
-const modalOverlay = document.getElementById('modalOverlay');
 function fecharModal() { modalOverlay.style.display = 'none'; }
 document.getElementById('closeModal').addEventListener('click', fecharModal);
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modalOverlay.style.display === 'block') fecharModal();
+});
 modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) fecharModal(); });
 
 // ==========================================
@@ -477,14 +670,14 @@ const screenGame = document.getElementById('screen-game');
 
 navLeitor.addEventListener('click', () => {
     screenReader.style.display = 'flex'; screenVocab.style.display = 'none'; screenGame.style.display = 'none';
-    navLeitor.style.borderBottom = '2px solid white'; navLeitor.style.color = 'white';
-    navVocab.style.borderBottom = 'none'; navVocab.style.color = '#ccc';
+    navLeitor.classList.add('active');
+    navVocab.classList.remove('active');
 });
 
 navVocab.addEventListener('click', () => {
     screenReader.style.display = 'none'; screenVocab.style.display = 'block'; screenGame.style.display = 'none';
-    navVocab.style.borderBottom = '2px solid white'; navVocab.style.color = 'white';
-    navLeitor.style.borderBottom = 'none'; navLeitor.style.color = '#ccc';
+    navVocab.classList.add('active');
+    navLeitor.classList.remove('active');
     carregarVocabulario(); 
 });
 
